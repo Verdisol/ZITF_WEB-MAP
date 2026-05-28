@@ -8,15 +8,14 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; } /* this body bg won't show because login covers full screen */
         
-        /* ----- LOGIN PAGE WITH zitf.jpg ----- */
+        /* LOGIN PAGE: ONLY the image, no green, no dark overlay */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
             display: flex; justify-content: center; align-items: center;
             z-index: 2000;
-            backdrop-filter: brightness(0.7);
         }
         .login-card {
             background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
@@ -33,7 +32,7 @@
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         .demo-note { margin-top: 15px; font-size: 0.8rem; color: #ccc; }
         
-        /* ----- MAP UI ----- */
+        /* MAP UI (unchanged) */
         .map-container { display: none; flex-direction: column; height: 100vh; }
         .top-bar { background: #0f2b1a; color: white; padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; z-index: 1001; }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
@@ -122,7 +121,7 @@
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'topright' }).addTo(map);
         
-        // ----- LOAD ZITF BOUNDARY FROM EXTERNAL GEOJSON FILE -----
+        // Load boundary from ZITF BOUNDARY.geojson
         try {
             const response = await fetch('ZITF BOUNDARY.geojson');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -130,13 +129,13 @@
             L.geoJSON(boundaryData, {
                 style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
             }).addTo(map);
-            console.log("✅ Boundary loaded from ZITF BOUNDARY.geojson");
+            console.log("Boundary loaded");
         } catch (err) {
-            console.error("❌ Could not load boundary:", err);
-            alert("Warning: Could not load ZITF BOUNDARY.geojson. Please ensure the file is in the same folder.");
+            console.error("Could not load boundary:", err);
+            alert("Warning: Could not load ZITF BOUNDARY.geojson");
         }
         
-        // ----- ROADS (inline GeoJSON with QGIS style) -----
+        // Roads (inline with QGIS style)
         const roadsGeoJSON = { "type": "FeatureCollection", "features": [
             { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
             { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
@@ -144,7 +143,7 @@
         ] };
         L.geoJSON(roadsGeoJSON, { style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" } }).addTo(map);
         
-        // ----- VENUES (banks, etc.) -----
+        // Venues (banks, etc.)
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -177,7 +176,7 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ----- GPS & ROUTING (unchanged) -----
+        // GPS & routing (unchanged)
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
         function getCurrentPosition() { return new Promise((resolve, reject) => { if (!navigator.geolocation) reject("Not supported"); navigator.geolocation.getCurrentPosition(pos => resolve([pos.coords.latitude, pos.coords.longitude]), err => reject(err.message), { enableHighAccuracy: true }); }); }
         async function updateGPSIndicator() { try { const pos = await getCurrentPosition(); currentPosition = pos; document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`; document.getElementById('gpsStatus').style.background = "#1e7e44"; if (userMarker) map.removeLayer(userMarker); userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup(); map.setView(pos, 18); return pos; } catch(err) { document.getElementById('gpsText').innerHTML = `⚠️ ${err.slice(0,30)}`; document.getElementById('gpsStatus').style.background = "#aa5533"; return null; } }
