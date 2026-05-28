@@ -119,7 +119,7 @@
 <!-- MAIN MAP INTERFACE -->
 <div id="mapContainer" class="map-container">
     <div class="top-bar">
-        <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
+        <h1>📍 ZITF NAVIGATION LIVE MAP</h1>   <!-- Changed header -->
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
     </div>
     <div id="map"></div>
@@ -174,8 +174,7 @@
         };
         L.geoJSON(zitfBoundary, { style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" } }).addTo(map);
         
-        // ========== ROADS (GeoJSON) with QGIS style ==========
-        // Style based on QGIS config: red (#db1e2a), width ~2.5px (0.66mm), dashed, round caps/joins
+        // ========== ROADS (GeoJSON) ==========
         const roadsGeoJSON = {
             "type": "FeatureCollection", "features": [
                 { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
@@ -183,16 +182,7 @@
                 { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
             ]
         };
-        L.geoJSON(roadsGeoJSON, {
-            style: {
-                color: "#db1e2a",        // QGIS red (219,30,42)
-                weight: 2.5,             // approximates 0.66mm on screen
-                opacity: 1,
-                lineCap: 'round',        // match QGIS capstyle=round
-                lineJoin: 'round',       // match QGIS joinstyle=round
-                dashArray: "4, 12"       // mimics custom dash 0.66;2 (dash 4px, gap 12px)
-            }
-        }).addTo(map);
+        L.geoJSON(roadsGeoJSON, { style: { color: "#3399ff", weight: 4, opacity: 0.8 } }).addTo(map);
         
         // ========== VENUES (Banks, ATMs, Food) ==========
         const venues = [
