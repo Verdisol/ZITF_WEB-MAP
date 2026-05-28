@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZITF Interactive Exhibition Guide</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { height: 100%; font-family: 'Segoe UI', sans-serif; }
+
+    /* LOGIN OVERLAY */
+    #login-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85); display: flex; align-items: center;
+      justify-content: center; z-index: 10000;
+    }
+    #login-box {
+      background: white; padding: 2.5rem; border-radius: 12px;
+      text-align: center; max-width: 340px; width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    #login-box h2 { margin-bottom: 1.5rem; color: #1a4b2e; }
+    #login-box input {
+      width: 100%; padding: 12px; margin-bottom: 15px;
+      border: 1px solid #ccc; border-radius: 6px; font-size: 1rem;
+    }
+    #login-box button {
+      width: 100%; padding: 12px; background: #1a4b2e;
+      color: white; border: none; border-radius: 6px; font-size: 1rem;
+      font-weight: bold; cursor: pointer;
+    }
+    #login-box button:hover { background: #2d6a4a; }
+    .login-error { color: #c0392b; margin-top: 10px; display: none; }
+
+    /* MAIN APP (hidden until login) */
+    #app { height: 100%; display: none; flex-direction: column; }
+    #map { flex: 1; }
+
+    /* TOP TOOLBAR */
+    #toolbar {
+      background: white; padding: 10px 15px; display: flex;
+      flex-wrap: wrap; align-items: center; gap: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 1000;
+    }
+    #search-box { flex: 1; min-width: 200px; position: relative; }
+    #search-box input {
+      width: 100%; padding: 8px 12px; border: 1px solid #ccc;
+      border-radius: 20px; font-size: 0.95rem;
+    }
+    #search-results {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border: 1px solid #ddd; max-height: 200px;
+      overflow-y: auto; display: none; z-index: 2000;
+      border-radius: 0 0 8px 8px;
+    }
+    .search-item {
+      padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee;
+    }
+    .search-item:hover { background: #f0f0f0; }
+
+    .tool-btn {
+      padding: 8px 15px; background: #1a4b2e; color: white;
+      border: none; border-radius: 20px; font-size: 0.9rem;
+      font-weight: 500; cursor: pointer; white-space: nowrap;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .tool-btn:hover { background: #2d6a4a; }
+    .tool-btn.active { background: #e67e22; }
+    .basemap-btn {
+      background: #444;
+    }
+    .basemap-btn.active { background: #e67e22; }
+
+    /* MEASUREMENT TOOLTIP */
+    .distance-popup {
+      background: rgba(0,0,0,0.8); color: white; padding: 4px 10px;
+      border-radius: 12px; font-size: 0.85rem; white-space: nowrap;
+    }
+
+    /* GPS marker pulse */
+    .pulse {
+      width: 20px; height: 20px; background: #4285F4;
+      border-radius: 50%; border: 3px solid white;
+      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+      animation: pulse-ring 1.5s infinite;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(66,133,244,0.5); }
+      70% { box-shadow: 0 0 0 12px rgba(66,133,244,0); }
+      100% { box-shadow: 0 0 0 0 rgba(66,133,244,0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-overlay">
+    <div id="login-box">
+      <h2>🔐 ZITF Exhibition Map</h2>
+      <input type="text" id="username" placeholder="Username" autocomplete="off">
+      <input type="password" id="password" placeholder="Password">
+      <button id="login-btn">Sign In</button>
+      <p class="login-error" id="login-error">Invalid credentials. Please try again.</p>
+    </div>
+  </div>
+
+  <!-- MAIN APPLICATION -->
+  <div id="app">
+    <div id="toolbar">
+      <div id="search-box">
+        <input type="text" id="search-input" placeholder="🔍 Search stands, banks, halls...">
+        <div id="search-results"></div>
+      </div>
+      <button class="tool-btn basemap-btn" id="btn-streets" title="OSM Street Map">🗺️ Streets</button>
+      <button class="tool-btn basemap-btn active" id="btn-satellite" title="High-Resolution Satellite">🛰️ Satellite</button>
+      <button class="tool-btn" id="btn-measure" title="Measure distance">📏 Measure</button>
+      <button class="tool-btn" id="btn-gps" title="Track my live location">📍 GPS</button>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ============== 1. LOGIN HANDLING ==============
+    const loginOverlay = document.getElementById('login-overlay');
+    const appDiv = document.getElementById('app');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+
+    const VALID_USER = 'admin';
+    const VALID_PASS = 'zritf2026';
+
+    loginBtn.addEventListener('click', () => {
+      if (usernameInput.value === VALID_USER && passwordInput.value === VALID_PASS) {
+        loginOverlay.style.display = 'none';
+        appDiv.style.display = 'flex';
+        initMap(); // Initialize map only after login
+      } else {
+        loginError.style.display = 'block';
+        passwordInput.value = '';
+      }
+    });
+
+    // Allow login with Enter key
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') loginBtn.click();
+    });
+
+    // ============== 2. MAP INITIALIZATION ==============
+    let map, streetsLayer, satelliteLayer;
+    let measureActive = false;
+    let measurePoints = [];
+    let measurePolyline = null;
+    let measureMarkers = [];
+    let gpsWatcher = null;
+    let gpsMarker = null;
+
+    // Pre-digitized layers (simulated GeoJSON data – replace with your actual layers)
+    const exhibitionData = {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": { "name": "Main Exhibition Hall", "category": "hall" },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+              [28.5325, -20.1570], [28.5345, -20.1570],
+              [28.5345, -20.1590], [28.5325, -20.1590],
+              [28.5325, -20.1570]
+            ]]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": { "name": "Stand A1 - TechAfrica", "category": "stand" },
+          "geometry": { "type": "Point", "coordinates": [28.5340, -20.1550] }
+        },
+        {
+          "type": "Feature",
+          "properties": { "name": "Stand B3 - EcoWorld", "category": "stand" },
+          "geometry": { "type": "Point", "coordinates": [28.5310, -20.1580] }
+        },
+        {
+          "type": "Feature",
+          "properties": { "name": "ZITF Bank Branch", "category": "bank" },
+          "geometry": { "type": "Point", "coordinates": [28.5300, -20.1560] }
+        },
+        {
+          "type": "Feature",
+          "properties": { "name": "Administration Offices", "category": "office" },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+              [28.5305, -20.1600], [28.5315, -20.1600],
+              [28.5315, -20.1610], [28.5305, -20.1610],
+              [28.5305, -20.1600]
+            ]]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": { "name": "Food Court", "category": "facility" },
+          "geometry": { "type": "Point", "coordinates": [28.5335, -20.1585] }
+        }
+      ]
+    };
+
+    function initMap() {
+      // Initialize map centered on ZITF grounds (approximate coordinates)
+      map = L.map('map', { zoomControl: true }).setView([-20.158, 28.533], 17);
+
+      // 2.1 Basemap layers
+      streetsLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      });
+
+      satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Esri, Maxar, Earthstar Geographics',
+        maxZoom: 19
+      });
+
+      // Default: satellite active (as per button state)
+      satelliteLayer.addTo(map);
+
+      // Add exhibition data to map (styled GeoJSON)
+      const geoLayer = L.geoJSON(exhibitionData, {
+        pointToLayer: (feature, latlng) => {
+          let iconUrl = 'https://cdn-icons-png.flaticon.com/512/684/684908.png'; // default pin
+          if (feature.properties.category === 'bank') iconUrl = 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png';
+          if (feature.properties.category === 'stand') iconUrl = 'https://cdn-icons-png.flaticon.com/512/3448/3448606.png';
+          return L.marker(latlng, {
+            icon: L.icon({ iconUrl, iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] })
+          });
+        },
+        style: (feature) => {
+          if (feature.geometry.type === 'Polygon') {
+            return { color: '#1a4b2e', weight: 2, fillOpacity: 0.2 };
+          }
+        },
+        onEachFeature: (feature, layer) => {
+          layer.bindPopup(`<strong>${feature.properties.name}</strong><br>Category: ${feature.properties.category}`);
+        }
+      }).addTo(map);
+
+      // Store GeoJSON layer for search
+      map.geoLayer = geoLayer;
+
+      // ============== 3. BASEMAP TOGGLE ==============
+      document.getElementById('btn-streets').addEventListener('click', () => {
+        if (map.hasLayer(satelliteLayer)) map.removeLayer(satelliteLayer);
+        if (!map.hasLayer(streetsLayer)) streetsLayer.addTo(map);
+        document.getElementById('btn-streets').classList.add('active');
+        document.getElementById('btn-satellite').classList.remove('active');
+      });
+      document.getElementById('btn-satellite').addEventListener('click', () => {
+        if (map.hasLayer(streetsLayer)) map.removeLayer(streetsLayer);
+        if (!map.hasLayer(satelliteLayer)) satelliteLayer.addTo(map);
+        document.getElementById('btn-satellite').classList.add('active');
+        document.getElementById('btn-streets').classList.remove('active');
+      });
+
+      // ============== 4. DYNAMIC SEARCH ==============
+      const searchInput = document.getElementById('search-input');
+      const searchResults = document.getElementById('search-results');
+
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim().toLowerCase();
+        searchResults.innerHTML = '';
+        if (query.length === 0) {
+          searchResults.style.display = 'none';
+          return;
+        }
+        const matchingFeatures = exhibitionData.features.filter(f =>
+          f.properties.name.toLowerCase().includes(query)
+        );
+        if (matchingFeatures.length === 0) {
+          searchResults.style.display = 'none';
+          return;
+        }
+        matchingFeatures.forEach((feature, idx) => {
+          const div = document.createElement('div');
+          div.className = 'search-item';
+          div.textContent = `${feature.properties.name} (${feature.properties.category})`;
+          div.addEventListener('click', () => {
+            // Zoom to feature
+            if (feature.geometry.type === 'Point') {
+              const coords = feature.geometry.coordinates;
+              map.setView([coords[1], coords[0]], 19);
+            } else if (feature.geometry.type === 'Polygon') {
+              // Get bounds from polygon coordinates (first ring)
+              const ring = feature.geometry.coordinates[0];
+              const latlngs = ring.map(c => [c[1], c[0]]);
+              map.fitBounds(L.latLngBounds(latlngs));
+            }
+            searchInput.value = feature.properties.name;
+            searchResults.style.display = 'none';
+          });
+          searchResults.appendChild(div);
+        });
+        searchResults.style.display = 'block';
+      });
+
+      // Hide results when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#search-box')) searchResults.style.display = 'none';
+      });
+
+      // ============== 5. DISTANCE MEASUREMENT TOOL ==============
+      function clearMeasurement() {
+        if (measurePolyline) map.removeLayer(measurePolyline);
+        measureMarkers.forEach(m => map.removeLayer(m));
+        measurePoints = [];
+        measureMarkers = [];
+        measurePolyline = null;
+      }
+
+      function updateMeasurementDisplay() {
+        if (measurePolyline) map.removeLayer(measurePolyline);
+        if (measurePoints.length > 1) {
+          measurePolyline = L.polyline(measurePoints, { color: '#e67e22', weight: 3, dashArray: '5, 5' }).addTo(map);
+          // Calculate total distance
+          let totalDist = 0;
+          for (let i = 1; i < measurePoints.length; i++) {
+            totalDist += map.distance(measurePoints[i - 1], measurePoints[i]);
+          }
+          // Show tooltip on last point
+          const lastPoint = measurePoints[measurePoints.length - 1];
+          if (measureMarkers.length > 0) {
+            const lastMarker = measureMarkers[measureMarkers.length - 1];
+            lastMarker.unbindTooltip();
+            lastMarker.bindTooltip(`${totalDist.toFixed(0)} m`, { permanent: true, className: 'distance-popup', direction: 'top' }).openTooltip();
+          }
+        }
+      }
+
+      document.getElementById('btn-measure').addEventListener('click', function() {
+        measureActive = !measureActive;
+        this.classList.toggle('active', measureActive);
+        if (!measureActive) {
+          clearMeasurement();
+          map.off('click', onMeasureClick);
+          return;
+        }
+        // Activate measurement: click on map adds a point
+        map.on('click', onMeasureClick);
+        // Disable other tools when measuring
+        if (gpsWatcher) {
+          stopGPSTracking();
+          document.getElementById('btn-gps').classList.remove('active');
+        }
+      });
+
+      function onMeasureClick(e) {
+        measurePoints.push(e.latlng);
+        const marker = L.circleMarker(e.latlng, {
+          radius: 6,
+          color: '#e67e22',
+          fillColor: '#fff',
+          fillOpacity: 1,
+          weight: 2
+        }).addTo(map);
+        measureMarkers.push(marker);
+        updateMeasurementDisplay();
+      }
+
+      // ============== 6. LIVE GPS TRACKING ==============
+      function startGPSTracking() {
+        if (!navigator.geolocation) {
+          alert("Geolocation is not supported by your browser.");
+          return;
+        }
+        // Clear existing marker
+        if (gpsMarker) map.removeLayer(gpsMarker);
+        gpsWatcher = navigator.geolocation.watchPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const latlng = L.latLng(lat, lng);
+            if (!gpsMarker) {
+              const icon = L.divIcon({ className: 'pulse', iconSize: [20, 20] });
+              gpsMarker = L.marker(latlng, { icon }).addTo(map);
+            } else {
+              gpsMarker.setLatLng(latlng);
+            }
+            map.setView(latlng, 18, { animate: true });
+          },
+          (err) => {
+            alert("Unable to retrieve location. " + err.message);
+            stopGPSTracking();
+          },
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        );
+      }
+
+      function stopGPSTracking() {
+        if (gpsWatcher !== null) {
+          navigator.geolocation.clearWatch(gpsWatcher);
+          gpsWatcher = null;
+        }
+        if (gpsMarker) {
+          map.removeLayer(gpsMarker);
+          gpsMarker = null;
+        }
+      }
+
+      document.getElementById('btn-gps').addEventListener('click', function() {
+        const isActive = this.classList.toggle('active');
+        if (isActive) {
+          // Stop measurement if active
+          if (measureActive) {
+            measureActive = false;
+            document.getElementById('btn-measure').classList.remove('active');
+            clearMeasurement();
+            map.off('click', onMeasureClick);
+          }
+          startGPSTracking();
+        } else {
+          stopGPSTracking();
+        }
+      });
+    }
+
+    // Helper: distance calculation in meters (Haversine)
+    L.Map.prototype.distance = function(latlng1, latlng2) {
+      const R = 6371000;
+      const dLat = (latlng2.lat - latlng1.lat) * Math.PI / 180;
+      const dLon = (latlng2.lng - latlng1.lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(latlng1.lat * Math.PI/180) * Math.cos(latlng2.lat * Math.PI/180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    };
+  </script>
+</body>
+</html>
