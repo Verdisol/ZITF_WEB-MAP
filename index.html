@@ -109,17 +109,17 @@
         <div class="welcome-text">🇿🇼 WELCOME TO ZITF</div>
         <div class="safety-text">PLEASE ENJOY YOUR VISIT AND STAY SAFE</div>
         <div style="font-weight:bold; margin:15px 0 5px;">ENTER YOUR DETAILS TO LOG IN</div>
-        <input type="text" id="loginUsername" placeholder="Email" value="visitor@zitf.com">
-        <input type="password" id="loginPassword" placeholder="Password" value="zitf@2026">
+        <input type="text" id="loginUsername" placeholder="Email or Username" value="visitor@zitf.com">
+        <input type="password" id="loginPassword" placeholder="Password" value="123456">
         <button id="loginBtn">🔓 ACCESS MAP</button>
-        <div class="demo-note">✨ Use: visitor@zitf.com / zitf@2026</div>
+        <div class="demo-note">✨ Demo: any credentials work</div>
     </div>
 </div>
 
 <!-- MAIN MAP INTERFACE -->
 <div id="mapContainer" class="map-container">
     <div class="top-bar">
-        <h1>📍 ZITF NAVIGATION LIVE MAP</h1>   <!-- Changed header -->
+        <h1>📍 ZITF LIVE MAP • BLINKING BEACONS</h1>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
     </div>
     <div id="map"></div>
@@ -139,17 +139,14 @@
 </div>
 
 <script>
-    // ========== LOGIN WITH EXACT CREDENTIALS ==========
+    // ========== LOGIN ==========
     document.getElementById('loginBtn').addEventListener('click', function() {
         const user = document.getElementById('loginUsername').value.trim();
         const pwd = document.getElementById('loginPassword').value.trim();
-        if (user === "visitor@zitf.com" && pwd === "zitf@2026") {
-            document.getElementById('loginContainer').style.display = 'none';
-            document.getElementById('mapContainer').style.display = 'flex';
-            initMap();
-        } else {
-            alert("Invalid credentials. Use visitor@zitf.com / zitf@2026");
-        }
+        if (user === "" || pwd === "") { alert("Please fill in both fields."); return; }
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('mapContainer').style.display = 'flex';
+        initMap();
     });
 
     // ========== MAP INIT ==========
