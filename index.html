@@ -18,8 +18,17 @@
     }
     #login-box {
       background: white; padding: 2.5rem; border-radius: 12px;
-      text-align: center; max-width: 340px; width: 90%;
+      text-align: center; max-width: 360px; width: 90%;
       box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    #login-box img {
+      max-width: 150px;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
     }
     #login-box h2 { margin-bottom: 1.5rem; color: #1a4b2e; }
     #login-box input {
@@ -98,6 +107,8 @@
   <!-- LOGIN SCREEN -->
   <div id="login-overlay">
     <div id="login-box">
+      <!-- Your logo image -->
+      <img src="zitf.JPG" alt="ZITF Logo">
       <h2>🔐 ZITF Exhibition Map</h2>
       <input type="text" id="username" placeholder="Username" autocomplete="off">
       <input type="password" id="password" placeholder="Password">
