@@ -3,37 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Login + GPS + Boundary & Roads</title>
+    <title>ZITF Live Map – Satellite + Login Background</title>
+    <!-- Leaflet CSS + JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; }
-        /* Login styles */
+        
+        /* ---------- LOGIN PAGE WITH zitf.jpg BACKGROUND ---------- */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, #0b2b1f, #1c4d2d);
+            background: url('zitf.jpg') center/cover no-repeat;
             display: flex; justify-content: center; align-items: center;
-            z-index: 2000; backdrop-filter: blur(2px);
+            z-index: 2000;
+            backdrop-filter: brightness(0.7);
         }
         .login-card {
-            background: rgba(255,255,255,0.95); border-radius: 40px; padding: 40px 35px;
-            width: 90%; max-width: 450px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            border-radius: 40px; padding: 40px 35px;
+            width: 90%; max-width: 450px; text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            border: 1px solid #ffd966;
+            color: white;
         }
-        .login-card h1 { font-size: 2rem; color: #1e5c3b; margin-bottom: 15px; }
-        .welcome-text { font-size: 1.2rem; font-weight: bold; color: #d4a017; }
-        .safety-text { font-size: 1rem; color: #2c6e3c; margin-bottom: 25px; font-style: italic; }
-        .login-card input { width: 100%; padding: 14px; margin: 10px 0; border: 2px solid #ccc; border-radius: 60px; }
-        .login-card button { background: #2e8b57; color: white; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; }
-        /* Map UI */
+        .login-card h1 { font-size: 2rem; color: #ffd966; margin-bottom: 15px; }
+        .welcome-text { font-size: 1.2rem; font-weight: bold; color: #ffaa33; }
+        .safety-text { font-size: 1rem; color: #ccffcc; margin-bottom: 25px; font-style: italic; }
+        .login-card input { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 60px; background: #fff; font-size: 1rem; }
+        .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+        .demo-note { margin-top: 15px; font-size: 0.8rem; color: #ccc; }
+        
+        /* ---------- MAP UI ---------- */
         .map-container { display: none; flex-direction: column; height: 100vh; }
         .top-bar { background: #0f2b1a; color: white; padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; z-index: 1001; }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
         .search-box { display: flex; gap: 6px; background: white; padding: 4px 10px; border-radius: 50px; }
         .search-box input { border: none; padding: 8px 12px; width: 200px; border-radius: 40px; outline: none; }
-        .search-box button { background: #00cc66; border: none; color: white; padding: 6px 18px; border-radius: 40px; cursor: pointer; }
+        .search-box button { background: #00cc66; border: none; color: white; padding: 6px 18px; border-radius: 40px; cursor: pointer; font-weight: bold; }
         .gps-indicator { background: #2b5a36; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; }
         #map { flex: 1; width: 100%; background: #cfe3cf; }
+        
+        /* Directions panel */
         .directions-card {
             position: absolute; bottom: 20px; right: 20px; width: 310px; max-height: 360px;
             background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); border-radius: 20px; padding: 12px;
@@ -43,6 +54,7 @@
         .directions-card h4 { display: flex; justify-content: space-between; margin-bottom: 8px; color: #88ffaa; }
         .close-dir { background: #aa3333; padding: 2px 10px; border-radius: 30px; cursor: pointer; }
         .step { padding: 8px 0; border-bottom: 1px solid #444; display: flex; gap: 8px; }
+        
         /* Blinking animation */
         @keyframes neonPulse {
             0% { filter: drop-shadow(0 0 0px #00ff66); }
@@ -53,11 +65,14 @@
         .leaflet-marker-icon { transition: transform 0.2s, filter 0.2s; cursor: pointer; }
         .leaflet-marker-icon:hover { transform: scale(1.25) translateY(-5px); filter: drop-shadow(0 0 16px #00ffaa) !important; z-index: 10000; }
         .route-line { stroke: #2a7fff; stroke-width: 5; stroke-dasharray: 8 4; }
+        
+        /* Layer control custom style (satellite button) */
+        .leaflet-control-layers { border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
-<!-- LOGIN PAGE -->
+<!-- LOGIN PAGE WITH zitf.jpg BACKGROUND -->
 <div id="loginContainer" class="login-container">
     <div class="login-card">
         <h1>🏟️ ZITF</h1>
@@ -67,7 +82,7 @@
         <input type="text" id="loginUsername" placeholder="Email or Username" value="visitor@zitf.com">
         <input type="password" id="loginPassword" placeholder="Password" value="123456">
         <button id="loginBtn">🔓 ACCESS MAP</button>
-        <div class="demo-note" style="margin-top:15px; font-size:0.8rem;">✨ Demo: any credentials work</div>
+        <div class="demo-note">✨ Demo: any credentials work</div>
     </div>
 </div>
 
@@ -89,34 +104,40 @@
 </div>
 
 <script>
-    // ========== LOGIN HANDLER ==========
+    // ========== LOGIN ==========
     document.getElementById('loginBtn').addEventListener('click', function() {
-        const username = document.getElementById('loginUsername').value.trim();
-        const password = document.getElementById('loginPassword').value.trim();
-        if (username === "" || password === "") {
-            alert("Please fill in both fields to continue.");
-            return;
-        }
+        const user = document.getElementById('loginUsername').value.trim();
+        const pwd = document.getElementById('loginPassword').value.trim();
+        if (user === "" || pwd === "") { alert("Please fill in both fields."); return; }
         document.getElementById('loginContainer').style.display = 'none';
         document.getElementById('mapContainer').style.display = 'flex';
         initMap();
     });
 
-    // ========== MAP INITIALIZATION ==========
+    // ========== MAP INIT ==========
     function initMap() {
-        const map = L.map('map').setView([-20.1325, 28.6272], 17);
-        // ROAD LAYER BY DEFAULT (OpenStreetMap)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
-        }).addTo(map);
-
-        // ========== 1. ZITF BOUNDARY (GeoJSON) ==========
-        // Sample boundary – replace with your actual zitf_boundary.geojson file
+        // Base layers: ROADS (default) and SATELLITE
+        const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        });
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+        
+        const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
+        
+        // Add layer control (satellite option)
+        L.control.layers({
+            "🗺️ Roads (Default)": roadLayer,
+            "🛰️ Satellite": satelliteLayer
+        }, null, { position: 'topright' }).addTo(map);
+        
+        // ========== ZITF BOUNDARY (GeoJSON) ==========
         const zitfBoundary = {
             "type": "FeatureCollection",
             "features": [{
                 "type": "Feature",
-                "properties": { "name": "ZITF Grounds Boundary" },
+                "properties": { "name": "ZITF Grounds" },
                 "geometry": {
                     "type": "Polygon",
                     "coordinates": [[
@@ -125,14 +146,11 @@
                 }
             }]
         };
-        const boundaryLayer = L.geoJSON(zitfBoundary, {
-            style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" },
-            pane: 'overlayPane'
+        L.geoJSON(zitfBoundary, {
+            style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
         }).addTo(map);
-        map.fitBounds(boundaryLayer.getBounds());
-
-        // ========== 2. ROADS (GeoJSON) ==========
-        // Sample roads inside ZITF – replace with actual roads.geojson
+        
+        // ========== ROADS (GeoJSON) ==========
         const roadsGeoJSON = {
             "type": "FeatureCollection",
             "features": [
@@ -142,11 +160,10 @@
             ]
         };
         L.geoJSON(roadsGeoJSON, {
-            style: { color: "#3399ff", weight: 4, opacity: 0.8, lineCap: 'round' },
-            pane: 'overlayPane'
+            style: { color: "#3399ff", weight: 4, opacity: 0.8 }
         }).addTo(map);
-
-        // ========== 3. VENUES (Banks, ATMs, Food, etc.) ==========
+        
+        // ========== VENUES (Banks, ATMs, Food) ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -158,16 +175,16 @@
             { name: "Information Kiosk", type: "info", lat: -20.1335, lng: 28.6278, icon: "ℹ️" },
             { name: "ZITF Security Post", type: "service", lat: -20.1362, lng: 28.6225, icon: "👮" }
         ];
-
+        
         const markersArray = [];
-
+        
         function createCustomIcon(emoji) {
             return L.divIcon({
                 html: `<div style="background: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid #00cc66; box-shadow: 0 2px 6px black; background: radial-gradient(circle, #ffffff, #f0fdf4);">${emoji}</div>`,
                 iconSize: [38, 38], popupAnchor: [0, -18]
             });
         }
-
+        
         venues.forEach(poi => {
             const icon = createCustomIcon(poi.icon);
             const marker = L.marker([poi.lat, poi.lng], { icon: icon, title: poi.name })
@@ -175,7 +192,7 @@
                 .addTo(map);
             marker.poiData = poi;
             markersArray.push(marker);
-
+            
             marker.on('add', function() {
                 const el = marker._icon;
                 if (el) {
@@ -194,13 +211,13 @@
             });
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
-
-        // ========== 4. GPS & ROUTING (FIXED replace error) ==========
+        
+        // ========== GPS & ROUTING (fixed replace error) ==========
         let currentPosition = null;
         let userMarker = null;
         let currentRoute = null;
         let destMarker = null;
-
+        
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) reject("Geolocation not supported");
@@ -211,7 +228,7 @@
                 );
             });
         }
-
+        
         async function updateGPSIndicator() {
             try {
                 const pos = await getCurrentPosition();
@@ -230,7 +247,7 @@
                 return null;
             }
         }
-
+        
         async function fetchRoute(startLatLng, endLatLng) {
             const url = `https://router.project-osrm.org/route/v1/foot/${startLatLng[1]},${startLatLng[0]};${endLatLng[1]},${endLatLng[0]}?overview=full&geometries=geojson&steps=true`;
             const resp = await fetch(url);
@@ -238,7 +255,7 @@
             if (data.code !== 'Ok') throw new Error("No walkable route found");
             return data.routes[0];
         }
-
+        
         function drawBlueRoute(geojson) {
             if (currentRoute) map.removeLayer(currentRoute);
             currentRoute = L.geoJSON(geojson, {
@@ -246,8 +263,7 @@
             }).addTo(map);
             map.fitBounds(currentRoute.getBounds());
         }
-
-        // FIXED: safe handling of missing instruction
+        
         function renderSteps(routeObj) {
             const panel = document.getElementById('directionsPanel');
             const container = document.getElementById('stepsContainer');
@@ -270,7 +286,7 @@
             });
             container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total: ${Math.round(totalDist)} m</div>`;
         }
-
+        
         async function searchAndNavigate(keyword) {
             if (!keyword.trim()) { alert("Enter search term"); return; }
             const matches = markersArray.filter(m => {
@@ -307,7 +323,8 @@
                 document.getElementById('directionsPanel').style.display = 'block';
             }
         }
-
+        
+        // Hook up UI
         document.getElementById('navigateBtn').addEventListener('click', () => searchAndNavigate(document.getElementById('searchField').value.trim()));
         document.getElementById('searchField').addEventListener('keypress', (e) => { if(e.key === 'Enter') document.getElementById('navigateBtn').click(); });
         document.getElementById('closeDirBtn').addEventListener('click', () => {
@@ -316,9 +333,9 @@
             if (destMarker) map.removeLayer(destMarker);
             currentRoute = null; destMarker = null;
         });
-
+        
         updateGPSIndicator().then(() => {
-            L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ LIVE MAP ACTIVE<br>✅ Boundary + Roads shown<br>🔍 Search 'bank' for GPS route").openOn(map);
+            L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ LIVE MAP ACTIVE<br>🛰️ Satellite available (top‑right)<br>🔍 Search 'bank' for GPS route").openOn(map);
         });
     }
 </script>
