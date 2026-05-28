@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF LIVE MAP – Blinking Markers + GPS Navigation</title>
+    <title>ZITF Live Map – Login & GPS Navigation</title>
     <!-- Leaflet CSS + JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -16,11 +16,90 @@
         body {
             font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
             height: 100vh;
-            display: flex;
-            flex-direction: column;
-            background: #1a2a1f;
+            background: #1e3a2f;
         }
-        /* Top bar */
+        /* ---------- LOGIN PAGE STYLES ---------- */
+        .login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0b2b1f 0%, #1c4d2d 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(2px);
+        }
+        .login-card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 40px;
+            padding: 40px 35px;
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            border: 1px solid #ffd966;
+        }
+        .login-card h1 {
+            font-size: 2rem;
+            color: #1e5c3b;
+            margin-bottom: 15px;
+        }
+        .welcome-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #d4a017;
+            margin-bottom: 10px;
+        }
+        .safety-text {
+            font-size: 1rem;
+            color: #2c6e3c;
+            margin-bottom: 25px;
+            font-style: italic;
+        }
+        .login-card input {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border: 2px solid #ccc;
+            border-radius: 60px;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+        }
+        .login-card input:focus {
+            border-color: #2e8b57;
+        }
+        .login-card button {
+            background: #2e8b57;
+            color: white;
+            border: none;
+            padding: 14px;
+            width: 100%;
+            border-radius: 60px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: 0.2s;
+        }
+        .login-card button:hover {
+            background: #236b45;
+            transform: scale(1.02);
+        }
+        .demo-note {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #555;
+        }
+        /* ---------- MAIN MAP UI (hidden until login) ---------- */
+        .map-container {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+        }
         .top-bar {
             background: #0f2b1a;
             color: white;
@@ -34,7 +113,6 @@
         }
         .top-bar h1 {
             font-size: 1.3rem;
-            letter-spacing: 1px;
             margin-right: auto;
             display: flex;
             align-items: center;
@@ -46,16 +124,14 @@
             background: white;
             padding: 4px 10px;
             border-radius: 50px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
         .search-box input {
             border: none;
             padding: 8px 12px;
-            width: 180px;
+            width: 200px;
             font-size: 1rem;
             border-radius: 40px;
             outline: none;
-            font-weight: 500;
         }
         .search-box button {
             background: #00cc66;
@@ -65,11 +141,6 @@
             border-radius: 40px;
             cursor: pointer;
             font-weight: bold;
-            transition: 0.2s;
-        }
-        .search-box button:hover {
-            background: #00994d;
-            transform: scale(1.02);
         }
         .gps-indicator {
             background: #2b5a36;
@@ -77,17 +148,13 @@
             border-radius: 40px;
             font-size: 0.8rem;
             font-family: monospace;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
-        /* Map container */
         #map {
             flex: 1;
             width: 100%;
             background: #cfe3cf;
         }
-        /* Directions panel (bottom right) */
+        /* Directions panel */
         .directions-card {
             position: absolute;
             bottom: 20px;
@@ -100,19 +167,17 @@
             padding: 12px;
             color: #f0f0f0;
             font-size: 13px;
-            font-family: 'Segoe UI', monospace;
             z-index: 1000;
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
             border-left: 5px solid #00ff88;
-            transition: 0.2s;
             overflow-y: auto;
+            display: none;
         }
         .directions-card h4 {
             margin-bottom: 8px;
             color: #88ffaa;
             display: flex;
             justify-content: space-between;
-            align-items: center;
         }
         .close-dir {
             cursor: pointer;
@@ -132,21 +197,11 @@
             display: flex;
             gap: 8px;
         }
-        .step-icon {
-            font-weight: bold;
-            color: #88ffaa;
-        }
-        /* ANIMATIONS FOR BLINKING MARKERS */
+        /* Blinking animation */
         @keyframes neonPulse {
-            0% {
-                filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44);
-            }
-            50% {
-                filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44);
-            }
-            100% {
-                filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44);
-            }
+            0% { filter: drop-shadow(0 0 0px #00ff66); }
+            50% { filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44); }
+            100% { filter: drop-shadow(0 0 0px #00ff66); }
         }
         .blinking-icon {
             animation: neonPulse 0.9s infinite ease-in-out;
@@ -165,12 +220,6 @@
             stroke: #2a7fff;
             stroke-width: 5;
             stroke-dasharray: 8 4;
-            animation: dashMove 0.4s linear infinite;
-        }
-        @keyframes dashMove {
-            to {
-                stroke-dashoffset: -24;
-            }
         }
         .user-location-icon {
             background: #ffffffdd;
@@ -178,7 +227,6 @@
             border: 2px solid #2a7fff;
             text-align: center;
             font-size: 20px;
-            font-weight: bold;
         }
         .dest-icon {
             background: #ffaa33;
@@ -193,37 +241,68 @@
     </style>
 </head>
 <body>
-<div class="top-bar">
-    <h1>📍 ZITF LIVE MAP • BLINKING BEACONS</h1>
-    <div class="search-box">
-        <input type="text" id="searchField" placeholder="Search: bank, atm, food..." value="bank">
-        <button id="navigateBtn">🧭 NAVIGATE</button>
-    </div>
-    <div class="gps-indicator" id="gpsStatus">
-        <span>🛰️</span> <span id="gpsText">Getting location...</span>
+
+<!-- LOGIN PAGE -->
+<div id="loginContainer" class="login-container">
+    <div class="login-card">
+        <h1>🏟️ ZITF</h1>
+        <div class="welcome-text">🇿🇼 WELCOME TO ZITF</div>
+        <div class="safety-text">PLEASE ENJOY YOUR VISIT AND STAY SAFE</div>
+        <div style="font-weight:bold; margin:15px 0 5px;">ENTER YOUR DETAILS TO LOG IN</div>
+        <input type="text" id="loginUsername" placeholder="Email or Username" value="visitor@zitf.com">
+        <input type="password" id="loginPassword" placeholder="Password" value="123456">
+        <button id="loginBtn">🔓 ACCESS MAP</button>
+        <div class="demo-note">✨ Demo: any credentials work</div>
     </div>
 </div>
-<div id="map"></div>
-<div id="directionsPanel" class="directions-card" style="display: none;">
-    <h4>🚶 TURN-BY-TURN <span class="close-dir" id="closeDirBtn">✖ CLOSE</span></h4>
-    <div id="stepsContainer" class="step-list"></div>
+
+<!-- MAIN MAP INTERFACE (hidden initially) -->
+<div id="mapContainer" class="map-container">
+    <div class="top-bar">
+        <h1>📍 ZITF LIVE MAP • BLINKING BEACONS</h1>
+        <div class="search-box">
+            <input type="text" id="searchField" placeholder="🔍 Search: bank, atm, food..." value="bank">
+            <button id="navigateBtn">🧭 NAVIGATE</button>
+        </div>
+        <div class="gps-indicator" id="gpsStatus">
+            <span>🛰️</span> <span id="gpsText">Getting location...</span>
+        </div>
+    </div>
+    <div id="map"></div>
+    <div id="directionsPanel" class="directions-card">
+        <h4>🚶 TURN-BY-TURN <span class="close-dir" id="closeDirBtn">✖ CLOSE</span></h4>
+        <div id="stepsContainer" class="step-list"></div>
+    </div>
 </div>
 
 <script>
-    // ============================================================
-    // FULL GPS NAVIGATION + BLINKING MARKERS + HOVER "LIVE" EFFECT
-    // ============================================================
-    (function() {
-        // ----- 1. INIT MAP (centered on ZITF grounds, Bulawayo) -----
+    // ========== LOGIN HANDLER ==========
+    document.getElementById('loginBtn').addEventListener('click', function() {
+        // Simple demo: any non-empty fields will log in
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value.trim();
+        if (username === "" || password === "") {
+            alert("Please fill in both fields to continue.");
+            return;
+        }
+        // Hide login, show map
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('mapContainer').style.display = 'flex';
+        // Initialize the map after login (ensures proper sizing)
+        initMap();
+    });
+
+    // ========== MAP FUNCTION (all features) ==========
+    function initMap() {
+        // Create map with road layer by default (OpenStreetMap standard)
         const map = L.map('map').setView([-20.1325, 28.6272], 17);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors | ZITF Interactive',
-            subdomains: 'abcd',
+        // ROAD LAYERS DISPLAYED BY DEFAULT (standard OSM layer shows roads clearly)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(map);
 
-        // ----- 2. SAMPLE DATA (YOU CAN REPLACE WITH REAL EXHIBITORS) -----
-        // All markers will blink green & show "LIVE" on hover
+        // Sample POIs (banks, ATMs, food, etc.)
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -238,7 +317,6 @@
 
         const markersArray = [];
 
-        // Custom DivIcon with emoji and white circle background (eye-catching)
         function createCustomIcon(emoji) {
             return L.divIcon({
                 html: `<div style="background: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid #00cc66; box-shadow: 0 2px 6px black; background: radial-gradient(circle, #ffffff, #f0fdf4);">${emoji}</div>`,
@@ -248,7 +326,6 @@
             });
         }
 
-        // Add markers with blinking class and hover live tooltip
         venues.forEach(poi => {
             const icon = createCustomIcon(poi.icon);
             const marker = L.marker([poi.lat, poi.lng], { icon: icon, title: poi.name })
@@ -257,14 +334,11 @@
             marker.poiData = poi;
             markersArray.push(marker);
 
-            // Add blinking class when icon is ready
             marker.on('add', function() {
                 const el = marker._icon;
                 if (el) {
                     el.classList.add('blinking-icon');
-                    // HOVER: show "LIVE" tooltip + extra glow
                     el.addEventListener('mouseenter', () => {
-                        // visual glow already in CSS, but also show tooltip
                         if (!marker._liveTip) {
                             marker.bindTooltip('🔴 LIVE', { direction: 'top', offset: [0, -22], permanent: false }).openTooltip();
                             marker._liveTip = true;
@@ -276,28 +350,24 @@
                     });
                 }
             });
-            if (marker._icon) {
-                marker._icon.classList.add('blinking-icon');
-            }
+            if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
 
-        // Ensure future markers also blink
         map.on('layeradd', (e) => {
             if (e.layer instanceof L.Marker && e.layer._icon) {
                 e.layer._icon.classList.add('blinking-icon');
             }
         });
 
-        // ----- 3. GPS & ROUTING ENGINE (OSRM walking) -----
+        // GPS & Routing
         let currentPosition = null;
         let userMarker = null;
         let currentRoute = null;
         let destMarker = null;
 
-        // Get user location with promise
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) reject("Geolocation not supported by browser");
+                if (!navigator.geolocation) reject("Geolocation not supported");
                 navigator.geolocation.getCurrentPosition(
                     (pos) => resolve([pos.coords.latitude, pos.coords.longitude]),
                     (err) => reject(`GPS error: ${err.message}`),
@@ -306,14 +376,12 @@
             });
         }
 
-        // Update GPS indicator on UI
         async function updateGPSIndicator() {
             try {
                 const pos = await getCurrentPosition();
                 currentPosition = pos;
                 document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`;
                 document.getElementById('gpsStatus').style.background = "#1e7e44";
-                // Show user dot on map
                 if (userMarker) map.removeLayer(userMarker);
                 userMarker = L.marker(pos, {
                     icon: L.divIcon({ html: '📍', className: 'user-location-icon', iconSize: [22, 22] }),
@@ -324,12 +392,10 @@
             } catch (err) {
                 document.getElementById('gpsText').innerHTML = `⚠️ ${err.message.slice(0, 30)}`;
                 document.getElementById('gpsStatus').style.background = "#aa5533";
-                console.warn(err);
                 return null;
             }
         }
 
-        // Fetch walking route from OSRM
         async function fetchRoute(startLatLng, endLatLng) {
             const url = `https://router.project-osrm.org/route/v1/foot/${startLatLng[1]},${startLatLng[0]};${endLatLng[1]},${endLatLng[0]}?overview=full&geometries=geojson&steps=true`;
             const resp = await fetch(url);
@@ -338,22 +404,14 @@
             return data.routes[0];
         }
 
-        // Draw blue route line (with animated dash)
         function drawBlueRoute(geojson) {
             if (currentRoute) map.removeLayer(currentRoute);
             currentRoute = L.geoJSON(geojson, {
-                style: {
-                    color: "#2a7fff",
-                    weight: 6,
-                    opacity: 0.95,
-                    lineCap: 'round',
-                    className: 'route-line'
-                }
+                style: { color: "#2a7fff", weight: 6, opacity: 0.95, lineCap: 'round', className: 'route-line' }
             }).addTo(map);
             map.fitBounds(currentRoute.getBounds());
         }
 
-        // Display turn-by-turn directions (human readable: turn right, walk 20m, then turn left)
         function renderSteps(routeObj) {
             const panel = document.getElementById('directionsPanel');
             const container = document.getElementById('stepsContainer');
@@ -363,97 +421,76 @@
             routeObj.legs.forEach(leg => {
                 totalDist += leg.distance;
                 leg.steps.forEach((step, idx) => {
-                    let rawInstruction = step.maneuver.instruction;
-                    // clean up generic "head" text
-                    let cleanInstr = rawInstruction.replace(/^Head /i, '👉 ').replace(/^Turn /i, '↪️ Turn ');
-                    if (!cleanInstr.includes('👉') && !cleanInstr.includes('↪️')) cleanInstr = '🔹 ' + cleanInstr;
-                    const distanceText = step.distance > 0 ? ` (${Math.round(step.distance)} m)` : '';
+                    let instr = step.maneuver.instruction;
+                    instr = instr.replace(/^Head /i, '👉 ').replace(/^Turn /i, '↪️ Turn ');
+                    if (!instr.includes('👉') && !instr.includes('↪️')) instr = '🔹 ' + instr;
+                    const distText = step.distance > 0 ? ` (${Math.round(step.distance)} m)` : '';
                     const stepDiv = document.createElement('div');
                     stepDiv.className = 'step';
-                    stepDiv.innerHTML = `<span class="step-icon">${idx+1}.</span> <span>${cleanInstr}${distanceText}</span>`;
+                    stepDiv.innerHTML = `<span class="step-icon">${idx+1}.</span> <span>${instr}${distText}</span>`;
                     container.appendChild(stepDiv);
                 });
             });
-            // add summary
             const summary = document.createElement('div');
             summary.style.marginTop = '12px';
             summary.style.borderTop = '1px solid #55aa77';
             summary.style.paddingTop = '8px';
             summary.innerHTML = `📏 <strong>Total distance: ${Math.round(totalDist)} meters</strong><br>🎯 Follow blue line on map`;
             container.appendChild(summary);
-            // auto scroll
-            container.scrollTop = 0;
         }
 
-        // Main navigation: search & route
         async function searchAndNavigate(keyword) {
             if (!keyword.trim()) {
-                alert("Please type something to search (e.g., bank, atm)");
+                alert("Please enter a search term (e.g., bank)");
                 return;
             }
-            // Find markers matching keyword in name OR type
             const matches = markersArray.filter(m => {
                 const data = m.poiData;
                 return data.name.toLowerCase().includes(keyword.toLowerCase()) ||
                        data.type.toLowerCase().includes(keyword.toLowerCase());
             });
             if (matches.length === 0) {
-                alert(`❌ No results for "${keyword}". Try "bank", "food", "info" etc.`);
+                alert(`❌ No results for "${keyword}". Try "bank", "food", etc.`);
                 return;
             }
             let targetMarker = matches[0];
             if (matches.length > 1) {
-                const choiceList = matches.map((m, i) => `${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
-                const selected = prompt(`🔍 Multiple matches:\n${choiceList}\n\nEnter number (1-${matches.length})`, "1");
+                const list = matches.map((m,i) => `${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
+                const selected = prompt(`🔍 Multiple matches:\n${list}\n\nEnter number (1-${matches.length})`, "1");
                 if (!selected) return;
-                const idx = parseInt(selected) - 1;
-                if (isNaN(idx) || idx < 0 || idx >= matches.length) {
-                    alert("Invalid selection");
-                    return;
-                }
+                const idx = parseInt(selected)-1;
+                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid"); return; }
                 targetMarker = matches[idx];
             }
-            // Ensure we have current GPS
             let userLoc = currentPosition;
             if (!userLoc) {
-                const gpsPos = await updateGPSIndicator();
-                if (!gpsPos) {
-                    alert("Cannot get your location. Please allow GPS and reload.");
-                    return;
-                }
-                userLoc = gpsPos;
+                const pos = await updateGPSIndicator();
+                if (!pos) { alert("Cannot get your location. Please allow GPS."); return; }
+                userLoc = pos;
             }
             const targetLatLng = targetMarker.getLatLng();
-            // show destination marker pulsating
             if (destMarker) map.removeLayer(destMarker);
             destMarker = L.marker(targetLatLng, {
-                icon: L.divIcon({ html: '🎯', className: 'dest-icon', iconSize: [28,28] }),
-                title: "Destination"
-            }).addTo(map).bindPopup(`<b>${targetMarker.poiData.name}</b><br>📍 Your selected destination`).openPopup();
-            // compute route
+                icon: L.divIcon({ html: '🎯', className: 'dest-icon', iconSize: [28,28] })
+            }).addTo(map).bindPopup(`<b>${targetMarker.poiData.name}</b><br>📍 Destination`).openPopup();
             try {
                 const route = await fetchRoute(userLoc, [targetLatLng.lat, targetLatLng.lng]);
                 drawBlueRoute(route.geometry);
                 renderSteps(route);
-                // zoom to full route bounds
                 if (currentRoute) map.fitBounds(currentRoute.getBounds());
-            } catch (err) {
+            } catch(err) {
                 alert("Routing error: " + err.message);
-                document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create walking path</div>`;
+                document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create route</div>`;
                 document.getElementById('directionsPanel').style.display = 'block';
             }
         }
 
-        // ----- 4. ATTACH UI EVENTS -----
         document.getElementById('navigateBtn').addEventListener('click', () => {
             const query = document.getElementById('searchField').value.trim();
             searchAndNavigate(query);
         });
-        // Allow "Enter" key on search field
         document.getElementById('searchField').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('navigateBtn').click();
-            }
+            if (e.key === 'Enter') document.getElementById('navigateBtn').click();
         });
         document.getElementById('closeDirBtn').addEventListener('click', () => {
             document.getElementById('directionsPanel').style.display = 'none';
@@ -463,15 +500,13 @@
             destMarker = null;
         });
 
-        // ----- 5. INIT GPS ON LOAD -----
         updateGPSIndicator().then(() => {
-            // optional welcome popup
             L.popup()
                 .setLatLng([-20.1325, 28.6272])
                 .setContent("✨ <b>LIVE MAP ACTIVE</b><br>✅ All markers blink green<br>🖱️ Hover any icon → 'LIVE' + glow<br>🔍 Search 'bank' → GPS route + turn directions")
                 .openOn(map);
         });
-    })();
+    }
 </script>
 </body>
 </html>
