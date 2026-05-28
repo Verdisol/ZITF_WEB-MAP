@@ -109,17 +109,17 @@
         <div class="welcome-text">🇿🇼 WELCOME TO ZITF</div>
         <div class="safety-text">PLEASE ENJOY YOUR VISIT AND STAY SAFE</div>
         <div style="font-weight:bold; margin:15px 0 5px;">ENTER YOUR DETAILS TO LOG IN</div>
-        <input type="text" id="loginUsername" placeholder="Email or Username" value="visitor@zitf.com">
-        <input type="password" id="loginPassword" placeholder="Password" value="123456">
+        <input type="text" id="loginUsername" placeholder="Email" value="visitor@zitf.com">
+        <input type="password" id="loginPassword" placeholder="Password" value="zitf@2026">
         <button id="loginBtn">🔓 ACCESS MAP</button>
-        <div class="demo-note">✨ Demo: any credentials work</div>
+        <div class="demo-note">✨ Use: visitor@zitf.com / zitf@2026</div>
     </div>
 </div>
 
 <!-- MAIN MAP INTERFACE -->
 <div id="mapContainer" class="map-container">
     <div class="top-bar">
-        <h1>📍 ZITF LIVE MAP • BLINKING BEACONS</h1>
+        <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
     </div>
     <div id="map"></div>
@@ -139,14 +139,17 @@
 </div>
 
 <script>
-    // ========== LOGIN ==========
+    // ========== LOGIN WITH EXACT CREDENTIALS ==========
     document.getElementById('loginBtn').addEventListener('click', function() {
         const user = document.getElementById('loginUsername').value.trim();
         const pwd = document.getElementById('loginPassword').value.trim();
-        if (user === "" || pwd === "") { alert("Please fill in both fields."); return; }
-        document.getElementById('loginContainer').style.display = 'none';
-        document.getElementById('mapContainer').style.display = 'flex';
-        initMap();
+        if (user === "visitor@zitf.com" && pwd === "zitf@2026") {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mapContainer').style.display = 'flex';
+            initMap();
+        } else {
+            alert("Invalid credentials. Use visitor@zitf.com / zitf@2026");
+        }
     });
 
     // ========== MAP INIT ==========
@@ -171,7 +174,8 @@
         };
         L.geoJSON(zitfBoundary, { style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" } }).addTo(map);
         
-        // ========== ROADS (GeoJSON) ==========
+        // ========== ROADS (GeoJSON) with QGIS style ==========
+        // Style based on QGIS config: red (#db1e2a), width ~2.5px (0.66mm), dashed, round caps/joins
         const roadsGeoJSON = {
             "type": "FeatureCollection", "features": [
                 { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
@@ -179,7 +183,16 @@
                 { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
             ]
         };
-        L.geoJSON(roadsGeoJSON, { style: { color: "#3399ff", weight: 4, opacity: 0.8 } }).addTo(map);
+        L.geoJSON(roadsGeoJSON, {
+            style: {
+                color: "#db1e2a",        // QGIS red (219,30,42)
+                weight: 2.5,             // approximates 0.66mm on screen
+                opacity: 1,
+                lineCap: 'round',        // match QGIS capstyle=round
+                lineJoin: 'round',       // match QGIS joinstyle=round
+                dashArray: "4, 12"       // mimics custom dash 0.66;2 (dash 4px, gap 12px)
+            }
+        }).addTo(map);
         
         // ========== VENUES (Banks, ATMs, Food) ==========
         const venues = [
