@@ -10,25 +10,18 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html { height: 100%; font-family: 'Segoe UI', sans-serif; }
 
-    /* LOGIN OVERLAY */
+    /* LOGIN OVERLAY – full background image from zitf.jpg */
     #login-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85); display: flex; align-items: center;
-      justify-content: center; z-index: 10000;
+      background: url('zitf.jpg') center/cover no-repeat;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000;
     }
     #login-box {
-      background: white; padding: 2.5rem; border-radius: 12px;
+      background: rgba(255,255,255,0.9); /* semi-transparent white for readability */
+      padding: 2.5rem; border-radius: 12px;
       text-align: center; max-width: 360px; width: 90%;
       box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-    }
-    #login-box img {
-      max-width: 150px;
-      height: auto;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
     }
     #login-box h2 { margin-bottom: 1.5rem; color: #1a4b2e; }
     #login-box input {
@@ -104,11 +97,9 @@
 </head>
 <body>
 
-  <!-- LOGIN SCREEN -->
+  <!-- LOGIN SCREEN – full background image from zitf.jpg -->
   <div id="login-overlay">
     <div id="login-box">
-      <!-- Your logo image -->
-      <img src="zitf.JPG" alt="ZITF Logo">
       <h2>🔐 ZITF Exhibition Map</h2>
       <input type="text" id="username" placeholder="Username" autocomplete="off">
       <input type="password" id="password" placeholder="Password">
@@ -144,7 +135,7 @@
     const loginError = document.getElementById('login-error');
 
     const VALID_USER = 'admin';
-    const VALID_PASS = 'zritf2026';
+    const VALID_PASS = 'zitf2026';   // <-- Updated password
 
     loginBtn.addEventListener('click', () => {
       if (usernameInput.value === VALID_USER && passwordInput.value === VALID_PASS) {
