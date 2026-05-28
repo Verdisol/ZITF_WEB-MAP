@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Satellite + Login Background</title>
-    <!-- Leaflet CSS + JS -->
+    <title>ZITF Live Map – Navigation + Search Bar</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; }
         
-        /* ---------- LOGIN PAGE WITH zitf.jpg BACKGROUND ---------- */
+        /* ----- LOGIN PAGE WITH zitf.jpg ----- */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
@@ -34,17 +33,50 @@
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         .demo-note { margin-top: 15px; font-size: 0.8rem; color: #ccc; }
         
-        /* ---------- MAP UI ---------- */
+        /* ----- MAP UI ----- */
         .map-container { display: none; flex-direction: column; height: 100vh; }
         .top-bar { background: #0f2b1a; color: white; padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; z-index: 1001; }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
-        .search-box { display: flex; gap: 6px; background: white; padding: 4px 10px; border-radius: 50px; }
-        .search-box input { border: none; padding: 8px 12px; width: 200px; border-radius: 40px; outline: none; }
-        .search-box button { background: #00cc66; border: none; color: white; padding: 6px 18px; border-radius: 40px; cursor: pointer; font-weight: bold; }
         .gps-indicator { background: #2b5a36; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; }
-        #map { flex: 1; width: 100%; background: #cfe3cf; }
         
-        /* Directions panel */
+        /* Navigation Panel (dedicated) */
+        .nav-panel {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            padding: 15px;
+            border-radius: 20px;
+            width: 280px;
+            z-index: 1000;
+            color: white;
+            border-left: 4px solid #00ff88;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .nav-panel h3 { margin-bottom: 10px; color: #88ffaa; font-size: 1rem; display: flex; align-items: center; gap: 5px; }
+        .nav-panel input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 30px;
+            border: none;
+            margin: 8px 0;
+            font-size: 0.9rem;
+        }
+        .nav-panel button {
+            width: 100%;
+            background: #00cc66;
+            border: none;
+            padding: 10px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .nav-panel button:hover { background: #00994d; }
+        .dest-suggest { font-size: 0.7rem; margin-top: 5px; color: #ccc; text-align: center; }
+        
+        /* Directions panel (bottom right) */
         .directions-card {
             position: absolute; bottom: 20px; right: 20px; width: 310px; max-height: 360px;
             background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); border-radius: 20px; padding: 12px;
@@ -65,14 +97,12 @@
         .leaflet-marker-icon { transition: transform 0.2s, filter 0.2s; cursor: pointer; }
         .leaflet-marker-icon:hover { transform: scale(1.25) translateY(-5px); filter: drop-shadow(0 0 16px #00ffaa) !important; z-index: 10000; }
         .route-line { stroke: #2a7fff; stroke-width: 5; stroke-dasharray: 8 4; }
-        
-        /* Layer control custom style (satellite button) */
-        .leaflet-control-layers { border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        #map { flex: 1; width: 100%; background: #cfe3cf; }
     </style>
 </head>
 <body>
 
-<!-- LOGIN PAGE WITH zitf.jpg BACKGROUND -->
+<!-- LOGIN PAGE -->
 <div id="loginContainer" class="login-container">
     <div class="login-card">
         <h1>🏟️ ZITF</h1>
@@ -90,13 +120,18 @@
 <div id="mapContainer" class="map-container">
     <div class="top-bar">
         <h1>📍 ZITF LIVE MAP • BLINKING BEACONS</h1>
-        <div class="search-box">
-            <input type="text" id="searchField" placeholder="🔍 Search: bank, atm, food..." value="bank">
-            <button id="navigateBtn">🧭 NAVIGATE</button>
-        </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
     </div>
     <div id="map"></div>
+    
+    <!-- DEDICATED NAVIGATION PANEL + SEARCH BAR -->
+    <div id="navPanel" class="nav-panel">
+        <h3>🧭 NAVIGATION OPTION</h3>
+        <input type="text" id="navSearchInput" placeholder="Search destination (bank, atm, food...)" value="bank">
+        <button id="navGoBtn">🔍 GET DIRECTIONS</button>
+        <div class="dest-suggest">e.g., bank, atm, food, info</div>
+    </div>
+    
     <div id="directionsPanel" class="directions-card">
         <h4>🚶 TURN-BY-TURN <span class="close-dir" id="closeDirBtn">✖ CLOSE</span></h4>
         <div id="stepsContainer" class="step-list"></div>
@@ -121,47 +156,30 @@
             attribution: '&copy; OpenStreetMap contributors'
         });
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            attribution: 'Tiles &copy; Esri'
         });
         
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
-        
-        // Add layer control (satellite option)
-        L.control.layers({
-            "🗺️ Roads (Default)": roadLayer,
-            "🛰️ Satellite": satelliteLayer
-        }, null, { position: 'topright' }).addTo(map);
+        L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'topright' }).addTo(map);
         
         // ========== ZITF BOUNDARY (GeoJSON) ==========
         const zitfBoundary = {
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": { "name": "ZITF Grounds" },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [-20.1400, 28.6200], [-20.1250, 28.6200], [-20.1250, 28.6350], [-20.1400, 28.6350], [-20.1400, 28.6200]
-                    ]]
-                }
+            "type": "FeatureCollection", "features": [{
+                "type": "Feature", "properties": { "name": "ZITF Grounds" },
+                "geometry": { "type": "Polygon", "coordinates": [[[-20.1400,28.6200],[-20.1250,28.6200],[-20.1250,28.6350],[-20.1400,28.6350],[-20.1400,28.6200]]] }
             }]
         };
-        L.geoJSON(zitfBoundary, {
-            style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
-        }).addTo(map);
+        L.geoJSON(zitfBoundary, { style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" } }).addTo(map);
         
         // ========== ROADS (GeoJSON) ==========
         const roadsGeoJSON = {
-            "type": "FeatureCollection",
-            "features": [
-                { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240, -20.1350], [28.6280, -20.1320], [28.6305, -20.1305]] } },
-                { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255, -20.1330], [28.6275, -20.1310], [28.6290, -20.1290]] } },
-                { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260, -20.1360], [28.6280, -20.1345], [28.6300, -20.1320]] } }
+            "type": "FeatureCollection", "features": [
+                { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
+                { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
+                { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
             ]
         };
-        L.geoJSON(roadsGeoJSON, {
-            style: { color: "#3399ff", weight: 4, opacity: 0.8 }
-        }).addTo(map);
+        L.geoJSON(roadsGeoJSON, { style: { color: "#3399ff", weight: 4, opacity: 0.8 } }).addTo(map);
         
         // ========== VENUES (Banks, ATMs, Food) ==========
         const venues = [
@@ -177,11 +195,10 @@
         ];
         
         const markersArray = [];
-        
         function createCustomIcon(emoji) {
             return L.divIcon({
                 html: `<div style="background: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid #00cc66; box-shadow: 0 2px 6px black; background: radial-gradient(circle, #ffffff, #f0fdf4);">${emoji}</div>`,
-                iconSize: [38, 38], popupAnchor: [0, -18]
+                iconSize: [38,38], popupAnchor: [0,-18]
             });
         }
         
@@ -199,7 +216,7 @@
                     el.classList.add('blinking-icon');
                     el.addEventListener('mouseenter', () => {
                         if (!marker._liveTip) {
-                            marker.bindTooltip('🔴 LIVE', { direction: 'top', offset: [0, -22] }).openTooltip();
+                            marker.bindTooltip('🔴 LIVE', { direction: 'top', offset: [0,-22] }).openTooltip();
                             marker._liveTip = true;
                             setTimeout(() => marker.closeTooltip(), 700);
                         } else {
@@ -212,7 +229,7 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== GPS & ROUTING (fixed replace error) ==========
+        // ========== GPS & ROUTING ==========
         let currentPosition = null;
         let userMarker = null;
         let currentRoute = null;
@@ -236,9 +253,7 @@
                 document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`;
                 document.getElementById('gpsStatus').style.background = "#1e7e44";
                 if (userMarker) map.removeLayer(userMarker);
-                userMarker = L.marker(pos, {
-                    icon: L.divIcon({ html: '📍', iconSize: [22,22], className: 'user-location-icon' })
-                }).addTo(map).bindPopup("You are here").openPopup();
+                userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup();
                 map.setView(pos, 18);
                 return pos;
             } catch (err) {
@@ -258,9 +273,7 @@
         
         function drawBlueRoute(geojson) {
             if (currentRoute) map.removeLayer(currentRoute);
-            currentRoute = L.geoJSON(geojson, {
-                style: { color: "#2a7fff", weight: 6, opacity: 0.95, className: 'route-line' }
-            }).addTo(map);
+            currentRoute = L.geoJSON(geojson, { style: { color: "#2a7fff", weight: 6, opacity: 0.95, className: 'route-line' } }).addTo(map);
             map.fitBounds(currentRoute.getBounds());
         }
         
@@ -288,29 +301,29 @@
         }
         
         async function searchAndNavigate(keyword) {
-            if (!keyword.trim()) { alert("Enter search term"); return; }
+            if (!keyword.trim()) { alert("Enter a destination (e.g., bank)"); return; }
             const matches = markersArray.filter(m => {
                 const d = m.poiData;
                 return d.name.toLowerCase().includes(keyword.toLowerCase()) || d.type.toLowerCase().includes(keyword.toLowerCase());
             });
-            if (matches.length === 0) { alert(`No "${keyword}" found`); return; }
+            if (matches.length === 0) { alert(`No "${keyword}" found. Try: bank, atm, food, info`); return; }
             let target = matches[0];
             if (matches.length > 1) {
                 const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
-                const sel = prompt(`Multiple found:\n${list}\nEnter number (1-${matches.length})`, "1");
+                const sel = prompt(`Multiple matches:\n${list}\nEnter number (1-${matches.length})`, "1");
                 if (!sel) return;
                 const idx = parseInt(sel)-1;
-                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid"); return; }
+                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid selection"); return; }
                 target = matches[idx];
             }
             let userPos = currentPosition;
             if (!userPos) {
                 userPos = await updateGPSIndicator();
-                if (!userPos) { alert("Cannot get your location."); return; }
+                if (!userPos) { alert("Cannot get your location. Enable GPS."); return; }
             }
             const tgtLatLng = target.getLatLng();
             if (destMarker) map.removeLayer(destMarker);
-            destMarker = L.marker(tgtLatLng, { icon: L.divIcon({ html: '🎯', className: 'dest-icon', iconSize: [28,28] }) })
+            destMarker = L.marker(tgtLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) })
                 .addTo(map).bindPopup(`<b>${target.poiData.name}</b><br>Destination`).openPopup();
             try {
                 const route = await fetchRoute(userPos, [tgtLatLng.lat, tgtLatLng.lng]);
@@ -324,9 +337,14 @@
             }
         }
         
-        // Hook up UI
-        document.getElementById('navigateBtn').addEventListener('click', () => searchAndNavigate(document.getElementById('searchField').value.trim()));
-        document.getElementById('searchField').addEventListener('keypress', (e) => { if(e.key === 'Enter') document.getElementById('navigateBtn').click(); });
+        // Hook up the dedicated navigation panel
+        document.getElementById('navGoBtn').addEventListener('click', () => {
+            const query = document.getElementById('navSearchInput').value.trim();
+            searchAndNavigate(query);
+        });
+        document.getElementById('navSearchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('navGoBtn').click();
+        });
         document.getElementById('closeDirBtn').addEventListener('click', () => {
             document.getElementById('directionsPanel').style.display = 'none';
             if (currentRoute) map.removeLayer(currentRoute);
@@ -335,7 +353,7 @@
         });
         
         updateGPSIndicator().then(() => {
-            L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ LIVE MAP ACTIVE<br>🛰️ Satellite available (top‑right)<br>🔍 Search 'bank' for GPS route").openOn(map);
+            L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ NAVIGATION READY<br>🛰️ Satellite view (top‑right)<br>🔍 Use left panel to search & navigate").openOn(map);
         });
     }
 </script>
