@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Boundary Always Visible</title>
+    <title>ZITF Live Map – Satellite + Full Legend</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -141,8 +141,9 @@
         }
     });
 
-    // List of all GeoJSON files (excluding boundary, handled separately)
+    // List of all GeoJSON files (including boundary and roads)
     const geojsonFiles = [
+        "ZITF BOUNDARY.geojson",  // explicit first
         "NATIONAL SECURITY FORCES.geojson",
         "MINING & EARTH MOVING.geojson",
         "LIVESTOCK EXHIBIT.geojson",
@@ -162,7 +163,7 @@
         "EMBASSIES.geojson",
         "CITY COUNCILS & MUNICIPALITIES.geojson",
         "CAR DEALERSHIPS.geojson",
-        "BOUNDARY.geojson",            // note: another boundary file
+        "BOUNDARY.geojson",            // extra boundary if exists
         "TELECOM & MOBILE NETWORK PROVIDERS.geojson",
         "ROADS.geojson",
         "TRANSPORT & TRAVELING.geojson",
@@ -176,49 +177,21 @@
     }
     
     async function initMap() {
-        const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' });
-        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+        // ========== BASE LAYERS (Roads and Satellite) ==========
+        const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+        });
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        });
+        
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         
-        // ========== 1. ZITF BOUNDARY - FORCED TO DISPLAY BY DEFAULT ==========
-        let boundaryLayer = null;
-        try {
-            console.log("Attempting to load ZITF BOUNDARY.geojson...");
-            const resp = await fetch('ZITF BOUNDARY.geojson');
-            if (resp.ok) {
-                const boundaryData = await resp.json();
-                boundaryLayer = L.geoJSON(boundaryData, {
-                    style: { color: "#ff6600", weight: 4, fillOpacity: 0.3, fillColor: "#ffaa44" }
-                }).addTo(map);
-                console.log("✅ ZITF BOUNDARY.geojson loaded and displayed");
-            } else {
-                throw new Error(`HTTP ${resp.status}`);
-            }
-        } catch (err) {
-            console.warn("Could not load ZITF BOUNDARY.geojson, using fallback:", err.message);
-            // Fallback inline boundary (rectangle around ZITF area)
-            const fallbackBoundary = {
-                "type": "FeatureCollection",
-                "features": [{
-                    "type": "Feature",
-                    "properties": { "name": "ZITF Grounds (Fallback)" },
-                    "geometry": { "type": "Polygon", "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]] }
-                }]
-            };
-            boundaryLayer = L.geoJSON(fallbackBoundary, {
-                style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" }
-            }).addTo(map);
-        }
+        // ========== OVERLAY CONTROL OBJECT (for legend) ==========
+        const overlayControlObject = {};
+        let allFeatures = []; // for search index
         
-        // ========== 2. LOAD ALL OTHER GEOJSON LAYERS ==========
-        let allFeatures = []; // for search
-        let overlayControlObject = {}; // for legend
-        
-        // Add boundary to overlay control (so it can be toggled, but it's already visible)
-        if (boundaryLayer) {
-            overlayControlObject["ZITF Boundary"] = boundaryLayer;
-        }
-        
+        // ========== LOAD EACH GEOJSON FILE AND ADD TO MAP & LEGEND ==========
         for (const fileName of geojsonFiles) {
             try {
                 console.log(`Loading ${fileName}...`);
@@ -229,6 +202,7 @@
                     console.warn(`${fileName} has no features, skipping.`);
                     continue;
                 }
+                // Determine style based on geometry type
                 const firstGeom = data.features[0]?.geometry?.type;
                 let style;
                 if (firstGeom === "LineString") {
@@ -238,11 +212,16 @@
                 } else {
                     style = { color: getRandomColor(), weight: 2 };
                 }
+                // Special handling for ZITF BOUNDARY: use fixed orange style
+                if (fileName === "ZITF BOUNDARY.geojson") {
+                    style = { color: "#ff6600", weight: 4, fillOpacity: 0.3, fillColor: "#ffaa44" };
+                }
                 const layer = L.geoJSON(data, { style }).addTo(map);
                 const displayName = fileName.replace('.geojson', '');
                 overlayControlObject[displayName] = layer;
+                // Add features to search index
                 data.features.forEach(feature => {
-                    const name = feature.properties?.name || feature.properties?.Name || feature.properties?.label || `Unnamed`;
+                    const name = feature.properties?.name || feature.properties?.Name || feature.properties?.label || `Unnamed in ${displayName}`;
                     allFeatures.push({
                         layer: layer,
                         feature: feature,
@@ -254,16 +233,43 @@
                 console.log(`✅ Loaded ${fileName} (${data.features.length} features)`);
             } catch (err) {
                 console.warn(`❌ Could not load ${fileName}: ${err.message}`);
+                // If ZITF BOUNDARY fails, add a fallback boundary manually
+                if (fileName === "ZITF BOUNDARY.geojson") {
+                    console.warn("Creating fallback boundary because file missing.");
+                    const fallbackBoundary = {
+                        "type": "FeatureCollection",
+                        "features": [{
+                            "type": "Feature",
+                            "properties": { "name": "ZITF Grounds (Fallback)" },
+                            "geometry": { "type": "Polygon", "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]] }
+                        }]
+                    };
+                    const fallbackLayer = L.geoJSON(fallbackBoundary, {
+                        style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" }
+                    }).addTo(map);
+                    overlayControlObject["ZITF Boundary (Fallback)"] = fallbackLayer;
+                    fallbackBoundary.features.forEach(f => {
+                        allFeatures.push({
+                            layer: fallbackLayer,
+                            feature: f,
+                            bounds: L.geoJSON(f).getBounds(),
+                            source: "ZITF Boundary (Fallback)",
+                            name: "ZITF Grounds (Fallback)"
+                        });
+                    });
+                }
             }
         }
         
-        // Add layer control legend with all overlays (boundary + others)
-        if (Object.keys(overlayControlObject).length > 0) {
-            L.control.layers({}, overlayControlObject, { position: 'bottomright' }).addTo(map);
-            console.log(`Legend added with ${Object.keys(overlayControlObject).length} layers`);
-        }
+        // ========== ADD LAYER CONTROL (Legend) with Base Layers and Overlays ==========
+        const baseLayers = {
+            "🗺️ Roads": roadLayer,
+            "🛰️ Satellite": satelliteLayer
+        };
+        L.control.layers(baseLayers, overlayControlObject, { position: 'bottomright' }).addTo(map);
+        console.log(`Legend added with ${Object.keys(overlayControlObject).length} overlay layers`);
         
-        // ========== 3. POI MARKERS (banks, etc.) ==========
+        // ========== POI MARKERS (banks, etc.) unchanged ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -307,7 +313,7 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== 4. SEARCH FUNCTION (across all loaded GeoJSON features) ==========
+        // ========== SEARCH FUNCTION (across all loaded GeoJSON features) ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -349,7 +355,7 @@
                 resultsDiv.style.display = 'none';
         });
         
-        // ========== 5. GPS NAVIGATION (same as before) ==========
+        // ========== GPS NAVIGATION (unchanged) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
@@ -498,7 +504,7 @@
         
         updateGPSIndicator().then(() => {
             L.popup().setLatLng([-20.1325,28.6272])
-                .setContent("✨ ZITF BOUNDARY VISIBLE BY DEFAULT<br>🔍 Search any keyword across all layers<br>🧭 Left panel for bank navigation")
+                .setContent("✨ SATELLITE & LEGEND RESTORED<br>🔍 Search any keyword across all layers<br>🧭 Left panel for bank navigation")
                 .openOn(map);
         });
     }
