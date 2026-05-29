@@ -1,9 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "REGULATORY SECTOR",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::20935" } },
-"features": [
-{ "type": "Feature", "properties": { "Name": "Zimbabwe Energy Regulatory Authority", "Proximity": "Procurement Regulatory Authority Of Zimbabwe" }, "geometry": { "type": "Point", "coordinates": [ 665976.750375974457711, 7769592.657530403696001 ] } },
-{ "type": "Feature", "properties": { "Name": "Procurement Regulatory Authority Of Zimbabwe", "Proximity": "Zimbabwe Energy Regulatory Authority" }, "geometry": { "type": "Point", "coordinates": [ 665992.842032530228607, 7769595.583286141045392 ] } }
-]
-}
