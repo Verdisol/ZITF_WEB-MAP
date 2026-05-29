@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+"name": "NATIONAL SECURITY FORCES",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "Zimbabwe Republic Police", "Proximity": "Gate 4" }, "geometry": { "type": "Point", "coordinates": [ 28.587603044759668, -20.168595823551804 ] } },
+{ "type": "Feature", "properties": { "Name": "ZRP Post", "Proximity": "Hall 1" }, "geometry": { "type": "Point", "coordinates": [ 28.588700058814126, -20.165193825267117 ] } },
+{ "type": "Feature", "properties": { "Name": "Zimbabwe Defence Forces", "Proximity": "Mozambican Pavilion" }, "geometry": { "type": "Point", "coordinates": [ 28.588176687950835, -20.16768531669166 ] } }
+]
+}
