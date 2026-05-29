@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Satellite + Full Legend</title>
+    <title>ZITF Live Map – Navigate Any Layer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -107,7 +107,7 @@
     <div class="top-bar">
         <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
         <div class="geojson-search">
-            <input type="text" id="geoSearchInput" placeholder="🔍 Search all layers (bank, security, mining...)" autocomplete="off">
+            <input type="text" id="geoSearchInput" placeholder="🔍 Search all layers (security, mining...)" autocomplete="off">
             <button id="geoSearchBtn">SEARCH</button>
         </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
@@ -117,9 +117,9 @@
     
     <div id="navPanel" class="nav-panel">
         <h3>🧭 NAVIGATION OPTION</h3>
-        <input type="text" id="navSearchInput" placeholder="Search bank, atm, food..." value="bank">
+        <input type="text" id="navSearchInput" placeholder="Search any feature (bank, gate, toilet...)" value="">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
-        <div class="dest-suggest">e.g., bank, atm, food, info</div>
+        <div class="dest-suggest">e.g., security, mining, embassy, toilet</div>
     </div>
     
     <div id="directionsPanel" class="directions-card">
@@ -141,9 +141,9 @@
         }
     });
 
-    // List of all GeoJSON files (including boundary and roads)
+    // List of all GeoJSON files (uppercase names as you provided)
     const geojsonFiles = [
-        "ZITF BOUNDARY.geojson",  // explicit first
+        "ZITF BOUNDARY.geojson",
         "NATIONAL SECURITY FORCES.geojson",
         "MINING & EARTH MOVING.geojson",
         "LIVESTOCK EXHIBIT.geojson",
@@ -163,7 +163,7 @@
         "EMBASSIES.geojson",
         "CITY COUNCILS & MUNICIPALITIES.geojson",
         "CAR DEALERSHIPS.geojson",
-        "BOUNDARY.geojson",            // extra boundary if exists
+        "BOUNDARY.geojson",
         "TELECOM & MOBILE NETWORK PROVIDERS.geojson",
         "ROADS.geojson",
         "TRANSPORT & TRAVELING.geojson",
@@ -176,33 +176,63 @@
         return `hsl(${hue}, 70%, 60%)`;
     }
     
+    // Helper: extract a navigable point from a GeoJSON feature
+    function getFeaturePoint(feature) {
+        const geom = feature.geometry;
+        if (!geom) return null;
+        if (geom.type === 'Point') {
+            return [geom.coordinates[1], geom.coordinates[0]];
+        } else if (geom.type === 'LineString') {
+            // use midpoint
+            const coords = geom.coordinates;
+            const mid = Math.floor(coords.length / 2);
+            return [coords[mid][1], coords[mid][0]];
+        } else if (geom.type === 'Polygon') {
+            // use centroid of first ring (simplified)
+            const coords = geom.coordinates[0];
+            let latSum = 0, lngSum = 0;
+            for (let i = 0; i < coords.length; i++) {
+                latSum += coords[i][1];
+                lngSum += coords[i][0];
+            }
+            return [latSum / coords.length, lngSum / coords.length];
+        } else if (geom.type === 'MultiPolygon' || geom.type === 'MultiLineString') {
+            // fallback to first element
+            const first = geom.coordinates[0];
+            if (geom.type === 'MultiPolygon') {
+                const coords = first[0];
+                let latSum = 0, lngSum = 0;
+                for (let i = 0; i < coords.length; i++) {
+                    latSum += coords[i][1];
+                    lngSum += coords[i][0];
+                }
+                return [latSum / coords.length, lngSum / coords.length];
+            } else {
+                const mid = Math.floor(first.length / 2);
+                return [first[mid][1], first[mid][0]];
+            }
+        }
+        return null;
+    }
+    
     async function initMap() {
-        // ========== BASE LAYERS (Roads and Satellite) ==========
-        const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        });
-        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri'
-        });
-        
+        // Base layers
+        const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' });
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         
-        // ========== OVERLAY CONTROL OBJECT (for legend) ==========
+        // Overlay control and search index
         const overlayControlObject = {};
-        let allFeatures = []; // for search index
+        let allFeatures = []; // each: { layer, feature, bounds, source, name, point }
         
-        // ========== LOAD EACH GEOJSON FILE AND ADD TO MAP & LEGEND ==========
+        // Load all GeoJSON files
         for (const fileName of geojsonFiles) {
             try {
                 console.log(`Loading ${fileName}...`);
                 const response = await fetch(fileName);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
-                if (!data.features || data.features.length === 0) {
-                    console.warn(`${fileName} has no features, skipping.`);
-                    continue;
-                }
-                // Determine style based on geometry type
+                if (!data.features || data.features.length === 0) throw new Error("No features");
                 const firstGeom = data.features[0]?.geometry?.type;
                 let style;
                 if (firstGeom === "LineString") {
@@ -212,64 +242,61 @@
                 } else {
                     style = { color: getRandomColor(), weight: 2 };
                 }
-                // Special handling for ZITF BOUNDARY: use fixed orange style
                 if (fileName === "ZITF BOUNDARY.geojson") {
                     style = { color: "#ff6600", weight: 4, fillOpacity: 0.3, fillColor: "#ffaa44" };
                 }
                 const layer = L.geoJSON(data, { style }).addTo(map);
                 const displayName = fileName.replace('.geojson', '');
                 overlayControlObject[displayName] = layer;
-                // Add features to search index
+                // Index each feature
                 data.features.forEach(feature => {
                     const name = feature.properties?.name || feature.properties?.Name || feature.properties?.label || `Unnamed in ${displayName}`;
+                    const point = getFeaturePoint(feature);
                     allFeatures.push({
                         layer: layer,
                         feature: feature,
                         bounds: L.geoJSON(feature).getBounds(),
                         source: displayName,
-                        name: name
+                        name: name,
+                        point: point,
+                        properties: feature.properties
                     });
                 });
                 console.log(`✅ Loaded ${fileName} (${data.features.length} features)`);
             } catch (err) {
                 console.warn(`❌ Could not load ${fileName}: ${err.message}`);
-                // If ZITF BOUNDARY fails, add a fallback boundary manually
+                // Special fallback for ZITF boundary
                 if (fileName === "ZITF BOUNDARY.geojson") {
-                    console.warn("Creating fallback boundary because file missing.");
-                    const fallbackBoundary = {
+                    const fallback = {
                         "type": "FeatureCollection",
                         "features": [{
                             "type": "Feature",
                             "properties": { "name": "ZITF Grounds (Fallback)" },
-                            "geometry": { "type": "Polygon", "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]] }
+                            "geometry": { "type": "Polygon", "coordinates": [[[-20.145,28.615],[-20.12,28.615],[-20.12,28.64],[-20.145,28.64],[-20.145,28.615]]] }
                         }]
                     };
-                    const fallbackLayer = L.geoJSON(fallbackBoundary, {
-                        style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" }
-                    }).addTo(map);
+                    const fallbackLayer = L.geoJSON(fallback, { style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" } }).addTo(map);
                     overlayControlObject["ZITF Boundary (Fallback)"] = fallbackLayer;
-                    fallbackBoundary.features.forEach(f => {
+                    fallback.features.forEach(f => {
                         allFeatures.push({
                             layer: fallbackLayer,
                             feature: f,
                             bounds: L.geoJSON(f).getBounds(),
                             source: "ZITF Boundary (Fallback)",
-                            name: "ZITF Grounds (Fallback)"
+                            name: "ZITF Grounds (Fallback)",
+                            point: getFeaturePoint(f),
+                            properties: f.properties
                         });
                     });
                 }
             }
         }
         
-        // ========== ADD LAYER CONTROL (Legend) with Base Layers and Overlays ==========
-        const baseLayers = {
-            "🗺️ Roads": roadLayer,
-            "🛰️ Satellite": satelliteLayer
-        };
+        // Legend control
+        const baseLayers = { "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer };
         L.control.layers(baseLayers, overlayControlObject, { position: 'bottomright' }).addTo(map);
-        console.log(`Legend added with ${Object.keys(overlayControlObject).length} overlay layers`);
         
-        // ========== POI MARKERS (banks, etc.) unchanged ==========
+        // ========== HARDCODED POI MARKERS (banks etc.) - keep for visual but also included in search? ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -313,7 +340,20 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== SEARCH FUNCTION (across all loaded GeoJSON features) ==========
+        // Add these POIs to allFeatures as well so they can be navigated too
+        venues.forEach(poi => {
+            allFeatures.push({
+                layer: null, // not a GeoJSON layer but still a feature
+                feature: null,
+                bounds: L.latLngBounds([poi.lat, poi.lng], [poi.lat, poi.lng]),
+                source: "POI (Bank/Food)",
+                name: poi.name,
+                point: [poi.lat, poi.lng],
+                properties: { type: poi.type, name: poi.name }
+            });
+        });
+        
+        // ========== SEARCH FUNCTION (for zoom to feature) ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -321,7 +361,17 @@
         function performSearch() {
             const query = searchInput.value.trim().toLowerCase();
             if (!query) { resultsDiv.style.display = 'none'; return; }
-            const matches = allFeatures.filter(item => item.name && item.name.toLowerCase().includes(query));
+            const matches = allFeatures.filter(item => {
+                // search in name and all string property values
+                if (item.name && item.name.toLowerCase().includes(query)) return true;
+                if (item.properties) {
+                    for (let key in item.properties) {
+                        let val = item.properties[key];
+                        if (val && typeof val === 'string' && val.toLowerCase().includes(query)) return true;
+                    }
+                }
+                return false;
+            });
             if (matches.length === 0) {
                 resultsDiv.innerHTML = '<div style="padding:8px;">No matches found</div>';
                 resultsDiv.style.display = 'block';
@@ -355,8 +405,9 @@
                 resultsDiv.style.display = 'none';
         });
         
-        // ========== GPS NAVIGATION (unchanged) ==========
+        // ========== NAVIGATION FUNCTION (for routing to any feature) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
+        
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) reject("Geolocation not supported");
@@ -367,6 +418,7 @@
                 );
             });
         }
+        
         async function updateGPSIndicator() {
             try {
                 const pos = await getCurrentPosition();
@@ -383,6 +435,7 @@
                 return null;
             }
         }
+        
         async function fetchRoute(start, end) {
             const url = `https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
             const resp = await fetch(url);
@@ -390,11 +443,13 @@
             if (data.code !== 'Ok') throw new Error(`OSRM error: ${data.code}`);
             return data.routes[0];
         }
+        
         function drawBlueRoute(geojson) {
             if (currentRoute) map.removeLayer(currentRoute);
             currentRoute = L.geoJSON(geojson, { style: { color: "#2a7fff", weight: 6, opacity: 0.95, className: 'route-line' } }).addTo(map);
             map.fitBounds(currentRoute.getBounds());
         }
+        
         function renderSteps(routeObj) {
             const panel = document.getElementById('directionsPanel');
             const container = document.getElementById('stepsContainer');
@@ -417,46 +472,70 @@
             });
             container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total distance: ${Math.round(totalDist)} meters</div>`;
         }
+        
         async function searchAndNavigate(keyword) {
-            if (!keyword.trim()) { alert("Enter a destination (e.g., bank)"); return; }
-            const matches = markersArray.filter(m => {
-                const d = m.poiData;
-                return d.name.toLowerCase().includes(keyword.toLowerCase()) || d.type.toLowerCase().includes(keyword.toLowerCase());
+            if (!keyword.trim()) { alert("Please enter a search term (e.g., security, mining, toilet)"); return; }
+            const query = keyword.toLowerCase();
+            // Search all features (including POIs and all GeoJSON layers)
+            const matches = allFeatures.filter(item => {
+                if (item.name && item.name.toLowerCase().includes(query)) return true;
+                if (item.properties) {
+                    for (let key in item.properties) {
+                        let val = item.properties[key];
+                        if (val && typeof val === 'string' && val.toLowerCase().includes(query)) return true;
+                    }
+                }
+                return false;
             });
             if (matches.length === 0) {
-                alert(`No "${keyword}" found among POI markers. Try: bank, atm, food, info`);
+                alert(`No features found matching "${keyword}". Try a different word.`);
                 return;
             }
             let target = matches[0];
             if (matches.length > 1) {
-                const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
+                const list = matches.map((m, i) => `${i+1}. ${m.name} (${m.source})`).join('\n');
                 const sel = prompt(`Multiple matches:\n${list}\nEnter number (1-${matches.length})`, "1");
                 if (!sel) return;
                 const idx = parseInt(sel)-1;
-                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid"); return; }
+                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid selection"); return; }
                 target = matches[idx];
             }
+            // Get destination point
+            let destPoint = target.point;
+            if (!destPoint) {
+                // try to compute from bounds center
+                if (target.bounds && target.bounds.isValid()) {
+                    const center = target.bounds.getCenter();
+                    destPoint = [center.lat, center.lng];
+                } else {
+                    alert("Cannot determine location for this feature.");
+                    return;
+                }
+            }
+            // Get user location
             let userPos = currentPosition;
             if (!userPos) {
                 userPos = await updateGPSIndicator();
-                if (!userPos) { alert("Cannot get your location."); return; }
+                if (!userPos) { alert("Cannot get your location. Please enable GPS."); return; }
             }
-            const tgtLatLng = target.getLatLng();
+            // Show destination marker
             if (destMarker) map.removeLayer(destMarker);
-            destMarker = L.marker(tgtLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) })
-                .addTo(map).bindPopup(`<b>${target.poiData.name}</b><br>Destination`).openPopup();
+            destMarker = L.marker(destPoint, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) })
+                .addTo(map).bindPopup(`<b>${target.name}</b><br>Destination`).openPopup();
             try {
-                const route = await fetchRoute(userPos, [tgtLatLng.lat, tgtLatLng.lng]);
+                const route = await fetchRoute(userPos, destPoint);
                 drawBlueRoute(route.geometry);
                 renderSteps(route);
-                alert(`Route found! ${Math.round(route.distance)} meters. Check blue line and directions.`);
+                alert(`Route found! ${Math.round(route.distance)} meters. Follow blue line and directions.`);
             } catch (err) {
+                console.error("Routing error:", err);
                 alert("Routing error: " + err.message);
                 document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ ${err.message}</div>`;
                 document.getElementById('directionsPanel').style.display = 'block';
             }
         }
         
+        // Attach navigation event
         document.getElementById('navGoBtn').addEventListener('click', () => {
             const query = document.getElementById('navSearchInput').value.trim();
             searchAndNavigate(query);
@@ -504,7 +583,7 @@
         
         updateGPSIndicator().then(() => {
             L.popup().setLatLng([-20.1325,28.6272])
-                .setContent("✨ SATELLITE & LEGEND RESTORED<br>🔍 Search any keyword across all layers<br>🧭 Left panel for bank navigation")
+                .setContent("✨ NAVIGATE ANY LAYER<br>🔍 Search: security, mining, toilet, gate, embassy...<br>🧭 Directions will appear as blue line")
                 .openOn(map);
         });
     }
