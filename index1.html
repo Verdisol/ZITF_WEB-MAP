@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Navigation + Search Bar</title>
+    <title>ZITF Live Map – GeoJSON Search + Navigation</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; }
         
-        /* ----- LOGIN PAGE WITH zitf.jpg (unchanged) ----- */
+        /* LOGIN PAGE: ONLY zitf.jpg – no green, no overlay */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: url('zitf.jpg') center/cover no-repeat;   /* STILL zitf.jpg */
+            background: url('zitf.jpg') center/cover no-repeat;
             display: flex; justify-content: center; align-items: center;
             z-index: 2000;
-            backdrop-filter: brightness(0.7);
         }
         .login-card {
             background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
@@ -33,11 +32,34 @@
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         .demo-note { margin-top: 15px; font-size: 0.8rem; color: #ccc; }
         
-        /* ----- MAP UI (unchanged) ----- */
+        /* MAP UI */
         .map-container { display: none; flex-direction: column; height: 100vh; }
         .top-bar { background: #0f2b1a; color: white; padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; z-index: 1001; }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
         .gps-indicator { background: #2b5a36; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; }
+        
+        /* GeoJSON search bar */
+        .geojson-search {
+            background: white; border-radius: 40px; padding: 4px 12px;
+            display: flex; gap: 6px; align-items: center;
+        }
+        .geojson-search input {
+            border: none; padding: 8px 12px; width: 200px; border-radius: 40px; outline: none;
+        }
+        .geojson-search button {
+            background: #ffaa33; border: none; padding: 6px 18px; border-radius: 40px;
+            font-weight: bold; cursor: pointer;
+        }
+        .search-results {
+            position: absolute; top: 70px; right: 20px;
+            background: white; color: black; border-radius: 12px;
+            max-width: 300px; max-height: 200px; overflow-y: auto;
+            z-index: 1002; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .search-results div {
+            padding: 8px 12px; border-bottom: 1px solid #ccc; cursor: pointer;
+        }
+        .search-results div:hover { background: #f0f0f0; }
         
         .nav-panel {
             position: absolute; top: 80px; left: 10px;
@@ -88,15 +110,22 @@
 <div id="mapContainer" class="map-container">
     <div class="top-bar">
         <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
+        <div class="geojson-search">
+            <input type="text" id="geoSearchInput" placeholder="🔍 Search GeoJSON (road, boundary...)" autocomplete="off">
+            <button id="geoSearchBtn">SEARCH</button>
+        </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
     </div>
     <div id="map"></div>
+    <div id="searchResults" class="search-results"></div>
+    
     <div id="navPanel" class="nav-panel">
         <h3>🧭 NAVIGATION OPTION</h3>
         <input type="text" id="navSearchInput" placeholder="Search destination (bank, atm, food...)" value="bank">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
         <div class="dest-suggest">e.g., bank, atm, food, info</div>
     </div>
+    
     <div id="directionsPanel" class="directions-card">
         <h4>🚶 TURN-BY-TURN <span class="close-dir" id="closeDirBtn">✖ CLOSE</span></h4>
         <div id="stepsContainer" class="step-list"></div>
@@ -104,6 +133,7 @@
 </div>
 
 <script>
+    // ========== LOGIN (exact credentials) ==========
     document.getElementById('loginBtn').addEventListener('click', function() {
         const user = document.getElementById('loginUsername').value.trim();
         const pwd = document.getElementById('loginPassword').value.trim();
@@ -116,25 +146,165 @@
         }
     });
 
-    function initMap() {
+    // ========== MAP INITIALIZATION ==========
+    async function initMap() {
         const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' });
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'topright' }).addTo(map);
         
-        // ZITF boundary
-        const zitfBoundary = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "name": "ZITF Grounds" }, "geometry": { "type": "Polygon", "coordinates": [[[-20.1400,28.6200],[-20.1250,28.6200],[-20.1250,28.6350],[-20.1400,28.6350],[-20.1400,28.6200]]] } }] };
-        L.geoJSON(zitfBoundary, { style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" } }).addTo(map);
+        // ========== STORE FOR GEOJSON FEATURES (for searching) ==========
+        let geoJsonFeatures = []; // each item: { layer, feature, bounds }
         
-        // Roads with QGIS style (only change from previous version)
-        const roadsGeoJSON = { "type": "FeatureCollection", "features": [
-            { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
-            { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
-            { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
-        ] };
-        L.geoJSON(roadsGeoJSON, { style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" } }).addTo(map);
+        // ========== 1. LOAD ZITF BOUNDARY ==========
+        try {
+            const resp = await fetch('ZITF BOUNDARY.geojson');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const boundaryData = await resp.json();
+            const boundaryLayer = L.geoJSON(boundaryData, {
+                style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
+            }).addTo(map);
+            // Extract features for search
+            if (boundaryData.features) {
+                boundaryData.features.forEach(f => {
+                    geoJsonFeatures.push({
+                        layer: boundaryLayer,
+                        feature: f,
+                        bounds: L.geoJSON(f).getBounds(),
+                        source: 'ZITF BOUNDARY'
+                    });
+                });
+            }
+            console.log("✅ Boundary loaded");
+        } catch (err) {
+            console.warn("Could not load ZITF BOUNDARY.geojson", err);
+        }
         
-        // Venues (banks, etc.)
+        // ========== 2. LOAD ROADS.geojson (if exists) ==========
+        try {
+            const resp = await fetch('ROADS.geojson');
+            if (resp.ok) {
+                const roadsData = await resp.json();
+                const roadsLayer = L.geoJSON(roadsData, {
+                    style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
+                }).addTo(map);
+                if (roadsData.features) {
+                    roadsData.features.forEach(f => {
+                        geoJsonFeatures.push({
+                            layer: roadsLayer,
+                            feature: f,
+                            bounds: L.geoJSON(f).getBounds(),
+                            source: 'ROADS'
+                        });
+                    });
+                }
+                console.log("✅ ROADS.geojson loaded");
+            } else {
+                console.log("ROADS.geojson not found, using inline roads");
+                // fallback to inline roads (same style)
+                const inlineRoads = {
+                    "type": "FeatureCollection", "features": [
+                        { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
+                        { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
+                        { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
+                    ]
+                };
+                const inlineLayer = L.geoJSON(inlineRoads, { style: { color: "#db1e2a", weight: 2.5, dashArray: "4,12", lineCap: 'round' } }).addTo(map);
+                inlineRoads.features.forEach(f => {
+                    geoJsonFeatures.push({ layer: inlineLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads (inline)' });
+                });
+            }
+        } catch (err) {
+            console.warn("No ROADS.geojson, using inline roads", err);
+            // Inline roads fallback
+            const inlineRoads = { "type": "FeatureCollection", "features": [
+                { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
+                { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
+                { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
+            ] };
+            const inlineLayer = L.geoJSON(inlineRoads, { style: { color: "#db1e2a", weight: 2.5, dashArray: "4,12", lineCap: 'round' } }).addTo(map);
+            inlineRoads.features.forEach(f => {
+                geoJsonFeatures.push({ layer: inlineLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads' });
+            });
+        }
+        
+        // ========== 3. ADD ANY OTHER UPPERCASE GEOJSON FILES? (optional) ==========
+        // You can list more files here, e.g., 'BUILDINGS.geojson', 'PARKING.geojson'
+        const extraFiles = []; // add names if needed
+        for (const file of extraFiles) {
+            try {
+                const resp = await fetch(file);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const layer = L.geoJSON(data).addTo(map);
+                    if (data.features) {
+                        data.features.forEach(f => {
+                            geoJsonFeatures.push({ layer, feature: f, bounds: L.geoJSON(f).getBounds(), source: file });
+                        });
+                    }
+                }
+            } catch(e) { console.warn(`Could not load ${file}`); }
+        }
+        
+        // ========== SEARCH FUNCTION FOR GEOJSON LAYERS ==========
+        const searchInput = document.getElementById('geoSearchInput');
+        const searchBtn = document.getElementById('geoSearchBtn');
+        const resultsDiv = document.getElementById('searchResults');
+        
+        function performSearch() {
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query) { resultsDiv.style.display = 'none'; return; }
+            const matches = geoJsonFeatures.filter(item => {
+                const props = item.feature.properties;
+                if (!props) return false;
+                return Object.values(props).some(val => 
+                    val && val.toString().toLowerCase().includes(query)
+                );
+            });
+            if (matches.length === 0) {
+                resultsDiv.innerHTML = '<div style="padding:8px;">No matches found</div>';
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            resultsDiv.innerHTML = matches.map((match, idx) => {
+                let label = match.feature.properties.name || match.feature.properties.Name || Object.values(match.feature.properties)[0] || `Feature ${idx+1}`;
+                return `<div data-idx="${idx}">📍 ${label} (${match.source})</div>`;
+            }).join('');
+            resultsDiv.style.display = 'block';
+            // attach click handlers
+            document.querySelectorAll('#searchResults div[data-idx]').forEach(div => {
+                div.addEventListener('click', (e) => {
+                    const idx = parseInt(div.getAttribute('data-idx'));
+                    const match = matches[idx];
+                    if (match && match.bounds.isValid()) {
+                        map.fitBounds(match.bounds);
+                        // optional: flash the layer
+                        if (match.layer && match.layer.setStyle) {
+                            match.layer.setStyle({ color: '#ffff00', weight: 5, opacity: 1 });
+                            setTimeout(() => {
+                                if (match.layer.setStyle) {
+                                    if (match.source === 'ZITF BOUNDARY')
+                                        match.layer.setStyle({ color: "#ff6600", weight: 3, fillOpacity: 0.1 });
+                                    else
+                                        match.layer.setStyle({ color: "#db1e2a", weight: 2.5, dashArray: "4,12" });
+                                }
+                            }, 1500);
+                        }
+                    }
+                    resultsDiv.style.display = 'none';
+                });
+            });
+        }
+        
+        searchBtn.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
+        document.addEventListener('click', (e) => {
+            if (!resultsDiv.contains(e.target) && e.target !== searchInput && e.target !== searchBtn) {
+                resultsDiv.style.display = 'none';
+            }
+        });
+        
+        // ========== VENUES (POI markers) ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -148,10 +318,15 @@
         ];
         const markersArray = [];
         function createCustomIcon(emoji) {
-            return L.divIcon({ html: `<div style="background: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid #00cc66; box-shadow: 0 2px 6px black; background: radial-gradient(circle, #ffffff, #f0fdf4);">${emoji}</div>`, iconSize: [38,38], popupAnchor: [0,-18] });
+            return L.divIcon({
+                html: `<div style="background: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid #00cc66; box-shadow: 0 2px 6px black; background: radial-gradient(circle, #ffffff, #f0fdf4);">${emoji}</div>`,
+                iconSize: [38,38], popupAnchor: [0,-18]
+            });
         }
         venues.forEach(poi => {
-            const marker = L.marker([poi.lat, poi.lng], { icon: createCustomIcon(poi.icon), title: poi.name }).bindPopup(`<b>${poi.name}</b><br>📌 ${poi.type.toUpperCase()}`).addTo(map);
+            const marker = L.marker([poi.lat, poi.lng], { icon: createCustomIcon(poi.icon), title: poi.name })
+                .bindPopup(`<b>${poi.name}</b><br>📌 ${poi.type.toUpperCase()}`)
+                .addTo(map);
             marker.poiData = poi;
             markersArray.push(marker);
             marker.on('add', function() {
@@ -159,27 +334,127 @@
                 if (el) {
                     el.classList.add('blinking-icon');
                     el.addEventListener('mouseenter', () => {
-                        if (!marker._liveTip) { marker.bindTooltip('🔴 LIVE', { direction: 'top', offset: [0,-22] }).openTooltip(); marker._liveTip = true; setTimeout(() => marker.closeTooltip(), 700); }
-                        else { marker.openTooltip(); setTimeout(() => marker.closeTooltip(), 600); }
+                        if (!marker._liveTip) {
+                            marker.bindTooltip('🔴 LIVE', { direction: 'top', offset: [0,-22] }).openTooltip();
+                            marker._liveTip = true;
+                            setTimeout(() => marker.closeTooltip(), 700);
+                        } else {
+                            marker.openTooltip();
+                            setTimeout(() => marker.closeTooltip(), 600);
+                        }
                     });
                 }
             });
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // GPS & routing (unchanged)
+        // ========== GPS & ROUTING (unchanged) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
-        function getCurrentPosition() { return new Promise((resolve, reject) => { if (!navigator.geolocation) reject("Not supported"); navigator.geolocation.getCurrentPosition(pos => resolve([pos.coords.latitude, pos.coords.longitude]), err => reject(err.message), { enableHighAccuracy: true }); }); }
-        async function updateGPSIndicator() { try { const pos = await getCurrentPosition(); currentPosition = pos; document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`; document.getElementById('gpsStatus').style.background = "#1e7e44"; if (userMarker) map.removeLayer(userMarker); userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup(); map.setView(pos, 18); return pos; } catch(err) { document.getElementById('gpsText').innerHTML = `⚠️ ${err.slice(0,30)}`; document.getElementById('gpsStatus').style.background = "#aa5533"; return null; } }
-        async function fetchRoute(start, end) { const url = `https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`; const resp = await fetch(url); const data = await resp.json(); if (data.code !== 'Ok') throw new Error("No route"); return data.routes[0]; }
-        function drawBlueRoute(geojson) { if (currentRoute) map.removeLayer(currentRoute); currentRoute = L.geoJSON(geojson, { style: { color: "#2a7fff", weight: 6, opacity: 0.95, className: 'route-line' } }).addTo(map); map.fitBounds(currentRoute.getBounds()); }
-        function renderSteps(routeObj) { const panel = document.getElementById('directionsPanel'); const container = document.getElementById('stepsContainer'); panel.style.display = 'block'; container.innerHTML = ''; let totalDist = 0; if (!routeObj.legs) return; routeObj.legs.forEach(leg => { totalDist += leg.distance; (leg.steps || []).forEach((step, idx) => { let instr = (step.maneuver && step.maneuver.instruction) ? step.maneuver.instruction : "Continue straight"; instr = instr.replace(/^Head /i, '👉 ').replace(/^Turn /i, '↪️ Turn '); if (!instr.includes('👉') && !instr.includes('↪️')) instr = '🔹 ' + instr; const distText = step.distance ? ` (${Math.round(step.distance)} m)` : ''; const stepDiv = document.createElement('div'); stepDiv.className = 'step'; stepDiv.innerHTML = `<span>${idx+1}.</span> <span>${instr}${distText}</span>`; container.appendChild(stepDiv); }); }); container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total: ${Math.round(totalDist)} m</div>`; }
-        async function searchAndNavigate(keyword) { if (!keyword.trim()) { alert("Enter a destination"); return; } const matches = markersArray.filter(m => m.poiData.name.toLowerCase().includes(keyword.toLowerCase()) || m.poiData.type.toLowerCase().includes(keyword.toLowerCase())); if (matches.length === 0) { alert(`No "${keyword}" found.`); return; } let target = matches[0]; if (matches.length > 1) { const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n'); const sel = prompt(`Multiple matches:\n${list}\nEnter number (1-${matches.length})`, "1"); if (!sel) return; const idx = parseInt(sel)-1; if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid"); return; } target = matches[idx]; } let userPos = currentPosition; if (!userPos) { userPos = await updateGPSIndicator(); if (!userPos) { alert("Cannot get your location."); return; } } const tgtLatLng = target.getLatLng(); if (destMarker) map.removeLayer(destMarker); destMarker = L.marker(tgtLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${target.poiData.name}</b><br>Destination`).openPopup(); try { const route = await fetchRoute(userPos, [tgtLatLng.lat, tgtLatLng.lng]); drawBlueRoute(route.geometry); renderSteps(route); if (currentRoute) map.fitBounds(currentRoute.getBounds()); } catch(err) { alert("Routing error: " + err.message); document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create route</div>`; document.getElementById('directionsPanel').style.display = 'block'; } }
+        function getCurrentPosition() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) reject("Geolocation not supported");
+                navigator.geolocation.getCurrentPosition(
+                    pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+                    err => reject(err.message),
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            });
+        }
+        async function updateGPSIndicator() {
+            try {
+                const pos = await getCurrentPosition();
+                currentPosition = pos;
+                document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`;
+                document.getElementById('gpsStatus').style.background = "#1e7e44";
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup();
+                map.setView(pos, 18);
+                return pos;
+            } catch (err) {
+                document.getElementById('gpsText').innerHTML = `⚠️ ${err.slice(0,30)}`;
+                document.getElementById('gpsStatus').style.background = "#aa5533";
+                return null;
+            }
+        }
+        async function fetchRoute(start, end) {
+            const url = `https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            if (data.code !== 'Ok') throw new Error("No walkable route found");
+            return data.routes[0];
+        }
+        function drawBlueRoute(geojson) {
+            if (currentRoute) map.removeLayer(currentRoute);
+            currentRoute = L.geoJSON(geojson, { style: { color: "#2a7fff", weight: 6, opacity: 0.95, className: 'route-line' } }).addTo(map);
+            map.fitBounds(currentRoute.getBounds());
+        }
+        function renderSteps(routeObj) {
+            const panel = document.getElementById('directionsPanel');
+            const container = document.getElementById('stepsContainer');
+            panel.style.display = 'block';
+            container.innerHTML = '';
+            let totalDist = 0;
+            if (!routeObj.legs) return;
+            routeObj.legs.forEach(leg => {
+                totalDist += leg.distance;
+                (leg.steps || []).forEach((step, idx) => {
+                    let instr = (step.maneuver && step.maneuver.instruction) ? step.maneuver.instruction : "Continue straight";
+                    instr = instr.replace(/^Head /i, '👉 ').replace(/^Turn /i, '↪️ Turn ');
+                    if (!instr.includes('👉') && !instr.includes('↪️')) instr = '🔹 ' + instr;
+                    const distText = step.distance ? ` (${Math.round(step.distance)} m)` : '';
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'step';
+                    stepDiv.innerHTML = `<span>${idx+1}.</span> <span>${instr}${distText}</span>`;
+                    container.appendChild(stepDiv);
+                });
+            });
+            container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total distance: ${Math.round(totalDist)} meters</div>`;
+        }
+        async function searchAndNavigate(keyword) {
+            if (!keyword.trim()) { alert("Enter a destination (e.g., bank)"); return; }
+            const matches = markersArray.filter(m => m.poiData.name.toLowerCase().includes(keyword.toLowerCase()) || m.poiData.type.toLowerCase().includes(keyword.toLowerCase()));
+            if (matches.length === 0) { alert(`No "${keyword}" found. Try: bank, atm, food, info`); return; }
+            let target = matches[0];
+            if (matches.length > 1) {
+                const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
+                const sel = prompt(`Multiple matches:\n${list}\nEnter number (1-${matches.length})`, "1");
+                if (!sel) return;
+                const idx = parseInt(sel)-1;
+                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid selection"); return; }
+                target = matches[idx];
+            }
+            let userPos = currentPosition;
+            if (!userPos) {
+                userPos = await updateGPSIndicator();
+                if (!userPos) { alert("Cannot get your location. Enable GPS."); return; }
+            }
+            const tgtLatLng = target.getLatLng();
+            if (destMarker) map.removeLayer(destMarker);
+            destMarker = L.marker(tgtLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${target.poiData.name}</b><br>Destination`).openPopup();
+            try {
+                const route = await fetchRoute(userPos, [tgtLatLng.lat, tgtLatLng.lng]);
+                drawBlueRoute(route.geometry);
+                renderSteps(route);
+                if (currentRoute) map.fitBounds(currentRoute.getBounds());
+            } catch(err) {
+                alert("Routing error: " + err.message);
+                document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create route</div>`;
+                document.getElementById('directionsPanel').style.display = 'block';
+            }
+        }
         
         document.getElementById('navGoBtn').addEventListener('click', () => searchAndNavigate(document.getElementById('navSearchInput').value.trim()));
         document.getElementById('navSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('navGoBtn').click(); });
-        document.getElementById('closeDirBtn').addEventListener('click', () => { document.getElementById('directionsPanel').style.display = 'none'; if (currentRoute) map.removeLayer(currentRoute); if (destMarker) map.removeLayer(destMarker); currentRoute = null; destMarker = null; });
-        updateGPSIndicator().then(() => { L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ NAVIGATION READY<br>🛰️ Satellite view (top‑right)<br>🔍 Use left panel to search & navigate").openOn(map); });
+        document.getElementById('closeDirBtn').addEventListener('click', () => {
+            document.getElementById('directionsPanel').style.display = 'none';
+            if (currentRoute) map.removeLayer(currentRoute);
+            if (destMarker) map.removeLayer(destMarker);
+            currentRoute = null; destMarker = null;
+        });
+        
+        updateGPSIndicator().then(() => {
+            L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ READY<br>🔍 Search GeoJSON layers (top‑right)<br>🧭 Left panel for bank navigation").openOn(map);
+        });
     }
 </script>
 </body>
