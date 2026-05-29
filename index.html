@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Search All GeoJSON Layers</title>
+    <title>ZITF Live Map – Boundary Always Visible</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; }
-        
-        /* LOGIN: only zitf.jpg */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
@@ -32,7 +30,6 @@
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         .demo-note { margin-top: 15px; font-size: 0.8rem; color: #ccc; }
         
-        /* MAP UI */
         .map-container { display: none; flex-direction: column; height: 100vh; }
         .top-bar { background: #0f2b1a; color: white; padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 15px; z-index: 1001; }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
@@ -55,9 +52,7 @@
             max-width: 320px; max-height: 300px; overflow-y: auto;
             z-index: 1002; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
-        .search-results div {
-            padding: 8px 12px; border-bottom: 1px solid #ccc; cursor: pointer;
-        }
+        .search-results div { padding: 8px 12px; border-bottom: 1px solid #ccc; cursor: pointer; }
         .search-results div:hover { background: #f0f0f0; }
         
         .nav-panel {
@@ -134,7 +129,6 @@
 </div>
 
 <script>
-    // LOGIN
     document.getElementById('loginBtn').addEventListener('click', function() {
         const user = document.getElementById('loginUsername').value.trim();
         const pwd = document.getElementById('loginPassword').value.trim();
@@ -147,7 +141,7 @@
         }
     });
 
-    // ========== LIST OF ALL GEOJSON FILES (exactly as you named them) ==========
+    // List of all GeoJSON files (excluding boundary, handled separately)
     const geojsonFiles = [
         "NATIONAL SECURITY FORCES.geojson",
         "MINING & EARTH MOVING.geojson",
@@ -168,17 +162,14 @@
         "EMBASSIES.geojson",
         "CITY COUNCILS & MUNICIPALITIES.geojson",
         "CAR DEALERSHIPS.geojson",
-        "BOUNDARY.geojson",            // note: you have both BOUNDARY and ZITF BOUNDARY?
+        "BOUNDARY.geojson",            // note: another boundary file
         "TELECOM & MOBILE NETWORK PROVIDERS.geojson",
         "ROADS.geojson",
         "TRANSPORT & TRAVELING.geojson",
         "TOILETS.geojson",
         "REGULATORY SECTOR.geojson"
     ];
-    // Also include ZITF BOUNDARY if it's separate (already covered by BOUNDARY? but we add for safety)
-    if (!geojsonFiles.includes("ZITF BOUNDARY.geojson")) geojsonFiles.push("ZITF BOUNDARY.geojson");
     
-    // Helper: generate random pastel color for each layer
     function getRandomColor() {
         const hue = Math.floor(Math.random() * 360);
         return `hsl(${hue}, 70%, 60%)`;
@@ -188,11 +179,45 @@
         const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' });
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
-        L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'bottomright' }).addTo(map);
         
-        // ========== LOAD ALL GEOJSON LAYERS ==========
-        let allFeatures = []; // each item: { layer, feature, bounds, source, name }
-        let overlayControlObject = {}; // for the legend (layer control)
+        // ========== 1. ZITF BOUNDARY - FORCED TO DISPLAY BY DEFAULT ==========
+        let boundaryLayer = null;
+        try {
+            console.log("Attempting to load ZITF BOUNDARY.geojson...");
+            const resp = await fetch('ZITF BOUNDARY.geojson');
+            if (resp.ok) {
+                const boundaryData = await resp.json();
+                boundaryLayer = L.geoJSON(boundaryData, {
+                    style: { color: "#ff6600", weight: 4, fillOpacity: 0.3, fillColor: "#ffaa44" }
+                }).addTo(map);
+                console.log("✅ ZITF BOUNDARY.geojson loaded and displayed");
+            } else {
+                throw new Error(`HTTP ${resp.status}`);
+            }
+        } catch (err) {
+            console.warn("Could not load ZITF BOUNDARY.geojson, using fallback:", err.message);
+            // Fallback inline boundary (rectangle around ZITF area)
+            const fallbackBoundary = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "properties": { "name": "ZITF Grounds (Fallback)" },
+                    "geometry": { "type": "Polygon", "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]] }
+                }]
+            };
+            boundaryLayer = L.geoJSON(fallbackBoundary, {
+                style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" }
+            }).addTo(map);
+        }
+        
+        // ========== 2. LOAD ALL OTHER GEOJSON LAYERS ==========
+        let allFeatures = []; // for search
+        let overlayControlObject = {}; // for legend
+        
+        // Add boundary to overlay control (so it can be toggled, but it's already visible)
+        if (boundaryLayer) {
+            overlayControlObject["ZITF Boundary"] = boundaryLayer;
+        }
         
         for (const fileName of geojsonFiles) {
             try {
@@ -204,9 +229,8 @@
                     console.warn(`${fileName} has no features, skipping.`);
                     continue;
                 }
-                // Determine style based on geometry type
-                let style;
                 const firstGeom = data.features[0]?.geometry?.type;
+                let style;
                 if (firstGeom === "LineString") {
                     style = { color: getRandomColor(), weight: 3, opacity: 0.9, lineCap: 'round', lineJoin: 'round' };
                 } else if (firstGeom === "Polygon" || firstGeom === "MultiPolygon") {
@@ -215,12 +239,10 @@
                     style = { color: getRandomColor(), weight: 2 };
                 }
                 const layer = L.geoJSON(data, { style }).addTo(map);
-                // Add to overlay control
                 const displayName = fileName.replace('.geojson', '');
                 overlayControlObject[displayName] = layer;
-                // Add each feature to search index
                 data.features.forEach(feature => {
-                    const name = feature.properties?.name || feature.properties?.Name || feature.properties?.label || `Unnamed feature`;
+                    const name = feature.properties?.name || feature.properties?.Name || feature.properties?.label || `Unnamed`;
                     allFeatures.push({
                         layer: layer,
                         feature: feature,
@@ -235,13 +257,13 @@
             }
         }
         
-        // Add layer control legend with all loaded overlays
+        // Add layer control legend with all overlays (boundary + others)
         if (Object.keys(overlayControlObject).length > 0) {
             L.control.layers({}, overlayControlObject, { position: 'bottomright' }).addTo(map);
-            console.log(`✅ Legend added with ${Object.keys(overlayControlObject).length} layers`);
+            console.log(`Legend added with ${Object.keys(overlayControlObject).length} layers`);
         }
         
-        // Also add the hardcoded POI markers (banks, etc.) – they are not in GeoJSON but part of the navigation
+        // ========== 3. POI MARKERS (banks, etc.) ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -284,9 +306,8 @@
             });
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
-        console.log(`✅ ${markersArray.length} POI markers added.`);
         
-        // ========== SEARCH FUNCTION ==========
+        // ========== 4. SEARCH FUNCTION (across all loaded GeoJSON features) ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -296,7 +317,7 @@
             if (!query) { resultsDiv.style.display = 'none'; return; }
             const matches = allFeatures.filter(item => item.name && item.name.toLowerCase().includes(query));
             if (matches.length === 0) {
-                resultsDiv.innerHTML = '<div style="padding:8px;">No matches found in any layer</div>';
+                resultsDiv.innerHTML = '<div style="padding:8px;">No matches found</div>';
                 resultsDiv.style.display = 'block';
                 return;
             }
@@ -311,7 +332,6 @@
                     const match = matches[idx];
                     if (match && match.bounds.isValid()) {
                         map.fitBounds(match.bounds);
-                        // Highlight the feature temporarily
                         if (match.layer && match.layer.setStyle) {
                             const originalStyle = match.layer.options.style;
                             match.layer.setStyle({ color: '#ffff00', weight: 5, opacity: 1 });
@@ -329,7 +349,7 @@
                 resultsDiv.style.display = 'none';
         });
         
-        // ========== NAVIGATION (POI routing) – unchanged ==========
+        // ========== 5. GPS NAVIGATION (same as before) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
@@ -350,10 +370,8 @@
                 if (userMarker) map.removeLayer(userMarker);
                 userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup();
                 map.setView(pos, 18);
-                console.log("GPS location:", pos);
                 return pos;
             } catch (err) {
-                console.error("GPS error:", err);
                 document.getElementById('gpsText').innerHTML = `⚠️ ${err.slice(0,30)}`;
                 document.getElementById('gpsStatus').style.background = "#aa5533";
                 return null;
@@ -447,7 +465,7 @@
             currentRoute = null; destMarker = null;
         });
         
-        // Make navigation panel draggable
+        // Draggable navigation panel
         const navPanel = document.getElementById('navPanel');
         const dragHandle = navPanel.querySelector('h3');
         let isDragging = false, offsetX, offsetY;
@@ -480,7 +498,7 @@
         
         updateGPSIndicator().then(() => {
             L.popup().setLatLng([-20.1325,28.6272])
-                .setContent("✨ ALL LAYERS LOADED<br>🔍 Search any keyword across all GeoJSON files<br>🧭 Left panel for bank navigation")
+                .setContent("✨ ZITF BOUNDARY VISIBLE BY DEFAULT<br>🔍 Search any keyword across all layers<br>🧭 Left panel for bank navigation")
                 .openOn(map);
         });
     }
