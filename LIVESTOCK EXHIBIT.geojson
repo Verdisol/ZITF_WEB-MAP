@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "LIVESTOCK EXHIBIT",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "Livestock Exhibit", "Proximity": "Hall 2" }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 28.589193366089287, -20.166316921172669 ], [ 28.58956822761764, -20.166336049097911 ], [ 28.589504754002856, -20.167131036409877 ], [ 28.589191292263319, -20.167121002696806 ], [ 28.589101797463012, -20.167028539656993 ], [ 28.589193366089287, -20.166316921172669 ] ] ] ] } }
+]
+}
