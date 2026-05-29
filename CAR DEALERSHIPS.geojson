@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "CAR DEALERSHIPS",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "Name": "Croco Motors", "Proximity": "Delta Beverages" }, "geometry": { "type": "Point", "coordinates": [ 665898.683112052851357, 7769632.115907995030284 ] } }
+]
+}

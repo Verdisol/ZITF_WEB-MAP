@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+"name": "MINING & EARTH MOVING",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::20935" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "Earth Moving Machinery Brokers", "Proximity": "Mimi's Kitchen" }, "geometry": { "type": "Point", "coordinates": [ 665898.386589901521802, 7769494.081037815660238 ] } },
+{ "type": "Feature", "properties": { "Name": "Zimbabwe Mining Development", "Proximity": "Earth Moving Machinery Brokers" }, "geometry": { "type": "Point", "coordinates": [ 665900.235535426996648, 7769469.528583575971425 ] } },
+{ "type": "Feature", "properties": { "Name": "Minerals Marketing Corporation Of Zimbabwe", "Proximity": "Gate 4" }, "geometry": { "type": "Point", "coordinates": [ 665895.334261442883871, 7769387.871760166250169 ] } }
+]
+}

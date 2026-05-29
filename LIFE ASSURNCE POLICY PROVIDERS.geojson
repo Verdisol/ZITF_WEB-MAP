@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "LIFE ASSURNCE POLICY PROVIDERS",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::20935" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "Moonlight Funeral", "Proximity": "Ministry Of Energy" }, "geometry": { "type": "Point", "coordinates": [ 665930.752341143204831, 7769533.597534193657339 ] } },
+{ "type": "Feature", "properties": { "Name": "Nyaradzo Funeral", "Proximity": "Powertel Telecommunications" }, "geometry": { "type": "Point", "coordinates": [ 666003.860232551582158, 7769510.6732326624915 ] } }
+]
+}

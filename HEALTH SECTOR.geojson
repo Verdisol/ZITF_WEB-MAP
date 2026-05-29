@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "HEALTH SECTOR",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::20935" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "CIMAS", "Proximity": "City Of Harare" }, "geometry": { "type": "Point", "coordinates": [ 665936.02943964372389, 7769523.506349641829729 ] } }
+]
+}
