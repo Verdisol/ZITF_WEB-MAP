@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – GeoJSON Search + Navigation</title>
+    <title>ZITF Live Map – Draggable Navigation + Layer Legend</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -61,13 +61,32 @@
         }
         .search-results div:hover { background: #f0f0f0; }
         
+        /* Draggable Navigation Panel */
         .nav-panel {
             position: absolute; top: 80px; left: 10px;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
             padding: 15px; border-radius: 20px; width: 280px;
             z-index: 1000; color: white; border-left: 4px solid #00ff88;
+            cursor: default;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .nav-panel h3 { margin-bottom: 10px; color: #88ffaa; }
+        .nav-panel.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+        }
+        .nav-panel h3 {
+            margin-bottom: 10px; color: #88ffaa;
+            cursor: grab;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-panel h3:active { cursor: grabbing; }
+        .drag-handle {
+            font-size: 1.2rem;
+            margin-right: 5px;
+        }
         .nav-panel input { width: 100%; padding: 10px; border-radius: 30px; border: none; margin: 8px 0; }
         .nav-panel button { width: 100%; background: #00cc66; border: none; padding: 10px; border-radius: 30px; font-weight: bold; cursor: pointer; }
         .directions-card {
@@ -90,6 +109,14 @@
         .leaflet-marker-icon:hover { transform: scale(1.25) translateY(-5px); filter: drop-shadow(0 0 16px #00ffaa) !important; z-index: 10000; }
         .route-line { stroke: #2a7fff; stroke-width: 5; stroke-dasharray: 8 4; }
         #map { flex: 1; width: 100%; background: #cfe3cf; }
+        
+        /* Small hint */
+        .drag-hint {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 8px;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
@@ -119,10 +146,12 @@
     <div id="map"></div>
     <div id="searchResults" class="search-results"></div>
     
+    <!-- Draggable Navigation Panel -->
     <div id="navPanel" class="nav-panel">
-        <h3>🧭 NAVIGATION OPTION</h3>
+        <h3><span class="drag-handle">⣿</span> 🧭 NAVIGATION OPTION</h3>
         <input type="text" id="navSearchInput" placeholder="Search bank, atm, food..." value="bank">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
+        <div class="drag-hint">(Drag the ⣿ handle to move)</div>
     </div>
     
     <div id="directionsPanel" class="directions-card">
@@ -149,95 +178,70 @@
         console.clear();
         console.log("🟢 INITIALIZING MAP...");
         
+        // Base layers
         const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' });
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+        
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
-        L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'topright' }).addTo(map);
         
-        // Store for search
-        let geoJsonFeatures = [];
+        // Store layers for overlay control
+        let boundaryOverlay = null;
+        let roadsOverlay = null;
+        let geoJsonFeatures = []; // for search
         
-        // ========== 1. ZITF BOUNDARY.GEOJSON with detailed logging ==========
-        console.log("→ Attempting to load ZITF BOUNDARY.geojson...");
+        // ========== 1. ZITF BOUNDARY overlay ==========
+        console.log("→ Loading ZITF BOUNDARY.geojson...");
         try {
             const response = await fetch('ZITF BOUNDARY.geojson');
-            console.log(`   Fetch status: ${response.status} ${response.statusText}`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status} - file not found or inaccessible`);
-            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const boundaryData = await response.json();
-            console.log("   ✓ File loaded, parsing GeoJSON...");
-            
-            // Check if GeoJSON has features
-            if (!boundaryData.features || boundaryData.features.length === 0) {
-                throw new Error("GeoJSON has no features");
-            }
-            
-            // Add boundary with BRIGHT style so it's very visible
-            const boundaryLayer = L.geoJSON(boundaryData, {
+            boundaryOverlay = L.geoJSON(boundaryData, {
                 style: { color: "#ff6600", weight: 4, fillOpacity: 0.3, fillColor: "#ffaa44" }
-            }).addTo(map);
-            console.log(`✅ SUCCESS: ZITF BOUNDARY loaded with ${boundaryData.features.length} features`);
-            
+            });
+            console.log(`✅ ZITF BOUNDARY loaded`);
             // Add to search index
             boundaryData.features.forEach(f => {
                 geoJsonFeatures.push({
-                    layer: boundaryLayer,
+                    layer: boundaryOverlay,
                     feature: f,
                     bounds: L.geoJSON(f).getBounds(),
                     source: 'ZITF BOUNDARY'
                 });
             });
-            
-            // Zoom to boundary bounds
-            const bounds = boundaryLayer.getBounds();
-            if (bounds.isValid()) map.fitBounds(bounds);
-            
         } catch (err) {
-            console.error(`❌ FAILED to load ZITF BOUNDARY.geojson: ${err.message}`);
-            console.warn("   → Using FALLBACK boundary (bright orange rectangle)");
-            
-            // Fallback boundary – large, visible rectangle
+            console.error(`❌ Could not load ZITF BOUNDARY.geojson: ${err.message}`);
+            // Fallback boundary
             const fallbackBoundary = {
                 "type": "FeatureCollection",
                 "features": [{
                     "type": "Feature",
-                    "properties": { "name": "ZITF Grounds (FALLBACK - check file)" },
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]]
-                    }
+                    "properties": { "name": "ZITF Grounds (FALLBACK)" },
+                    "geometry": { "type": "Polygon", "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]] }
                 }]
             };
-            const fallbackLayer = L.geoJSON(fallbackBoundary, {
+            boundaryOverlay = L.geoJSON(fallbackBoundary, {
                 style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" }
-            }).addTo(map);
-            fallbackBoundary.features.forEach(f => {
-                geoJsonFeatures.push({ layer: fallbackLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Boundary (FALLBACK)' });
             });
-            
-            // Also add a popup explaining the issue
-            L.popup()
-                .setLatLng([-20.1325, 28.6272])
-                .setContent("⚠️ <b>ZITF BOUNDARY.geojson not found</b><br>Using fallback rectangle.<br>Check console for details.")
-                .openOn(map);
+            fallbackBoundary.features.forEach(f => {
+                geoJsonFeatures.push({ layer: boundaryOverlay, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Boundary (FALLBACK)' });
+            });
         }
         
-        // ========== 2. ROADS (external or fallback) ==========
-        console.log("→ Attempting to load ROADS.geojson...");
+        // ========== 2. ROADS overlay ==========
+        console.log("→ Loading ROADS.geojson...");
         try {
             const resp = await fetch('ROADS.geojson');
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const roadsData = await resp.json();
-            const roadsLayer = L.geoJSON(roadsData, {
+            roadsOverlay = L.geoJSON(roadsData, {
                 style: { color: "#db1e2a", weight: 3, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
-            }).addTo(map);
+            });
+            console.log(`✅ ROADS.geojson loaded`);
             if (roadsData.features) {
                 roadsData.features.forEach(f => {
-                    geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ROADS' });
+                    geoJsonFeatures.push({ layer: roadsOverlay, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ROADS' });
                 });
             }
-            console.log(`✅ ROADS.geojson loaded (${roadsData.features?.length || 0} features)`);
         } catch (err) {
             console.warn(`⚠️ ROADS.geojson not found, using inline roads`);
             const inlineRoads = {
@@ -248,15 +252,29 @@
                     { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
                 ]
             };
-            const roadsLayer = L.geoJSON(inlineRoads, {
+            roadsOverlay = L.geoJSON(inlineRoads, {
                 style: { color: "#db1e2a", weight: 3, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
-            }).addTo(map);
+            });
             inlineRoads.features.forEach(f => {
-                geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads (inline)' });
+                geoJsonFeatures.push({ layer: roadsOverlay, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads (inline)' });
             });
         }
         
-        // ========== 3. SEARCH FUNCTION ==========
+        // Add overlays to map (both visible by default)
+        if (boundaryOverlay) boundaryOverlay.addTo(map);
+        if (roadsOverlay) roadsOverlay.addTo(map);
+        
+        // ========== 3. LEGEND: Layer control with overlays ==========
+        const overlayControl = {
+            "🟧 ZITF Boundary": boundaryOverlay,
+            "🛣️ Roads": roadsOverlay
+        };
+        L.control.layers({
+            "🗺️ Roads": roadLayer,
+            "🛰️ Satellite": satelliteLayer
+        }, overlayControl, { position: 'bottomright' }).addTo(map);
+        
+        // ========== 4. SEARCH FUNCTION for GeoJSON ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -285,18 +303,17 @@
                     const match = matches[idx];
                     if (match && match.bounds.isValid()) {
                         map.fitBounds(match.bounds);
-                        // highlight
+                        // flash highlight
                         if (match.layer && match.layer.setStyle) {
-                            const orig = match.layer.options.style;
+                            const origStyle = match.layer.options.style;
                             match.layer.setStyle({ color: '#ffff00', weight: 6 });
-                            setTimeout(() => match.layer.setStyle(orig), 1500);
+                            setTimeout(() => match.layer.setStyle(origStyle), 1500);
                         }
                     }
                     resultsDiv.style.display = 'none';
                 });
             });
         }
-        
         searchBtn.addEventListener('click', performSearch);
         searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
         document.addEventListener('click', (e) => {
@@ -304,7 +321,7 @@
                 resultsDiv.style.display = 'none';
         });
         
-        // ========== 4. VENUES (banks, etc.) with blinking ==========
+        // ========== 5. VENUES (banks, etc.) with blinking ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -348,7 +365,7 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== 5. GPS & ROUTING (unchanged, working) ==========
+        // ========== 6. GPS & ROUTING ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
@@ -453,7 +470,45 @@
         });
         
         updateGPSIndicator();
-        console.log("🟢 MAP INITIALIZATION COMPLETE");
+        
+        // ========== 7. MAKE NAVIGATION PANEL DRAGGABLE ==========
+        const navPanel = document.getElementById('navPanel');
+        const dragHandle = navPanel.querySelector('h3');
+        let isDragging = false;
+        let offsetX, offsetY;
+        
+        dragHandle.addEventListener('mousedown', (e) => {
+            // Only start drag if clicking on the handle area (including the grip icon)
+            if (e.target.closest('.drag-handle') || e.target === dragHandle || dragHandle.contains(e.target)) {
+                isDragging = true;
+                offsetX = e.clientX - navPanel.offsetLeft;
+                offsetY = e.clientY - navPanel.offsetTop;
+                navPanel.classList.add('dragging');
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let newLeft = e.clientX - offsetX;
+            let newTop = e.clientY - offsetY;
+            // Constrain within window edges
+            newLeft = Math.min(Math.max(newLeft, 5), window.innerWidth - navPanel.offsetWidth - 5);
+            newTop = Math.min(Math.max(newTop, 5), window.innerHeight - navPanel.offsetHeight - 5);
+            navPanel.style.left = newLeft + 'px';
+            navPanel.style.top = newTop + 'px';
+            navPanel.style.right = 'auto';
+            navPanel.style.bottom = 'auto';
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                navPanel.classList.remove('dragging');
+            }
+        });
+        
+        console.log("🟢 MAP INIT COMPLETE – Legend with Roads/Boundary toggles, Navigation panel draggable");
     }
 </script>
 </body>
