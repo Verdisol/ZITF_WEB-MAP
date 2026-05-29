@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – All Layers</title>
+    <title>ZITF Live Map – Blinking UI + Draggable Nav</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; height: 100vh; background: #1e3a2f; }
         
+        /* ----- LOGIN PAGE (blinking green shadow) ----- */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
@@ -17,12 +18,14 @@
             z-index: 2000;
         }
         .login-card {
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
             border-radius: 40px; padding: 40px 35px;
             width: 90%; max-width: 450px; text-align: center;
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
             border: 1px solid #ffd966;
             color: white;
+            animation: neonPulse 0.9s infinite ease-in-out;
         }
         .login-card h1 { font-size: 2rem; color: #ffd966; margin-bottom: 15px; }
         .welcome-text { font-size: 1.2rem; font-weight: bold; color: #ffaa33; }
@@ -30,6 +33,7 @@
         .login-card input { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 60px; background: #fff; font-size: 1rem; }
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         
+        /* ----- MAP UI (blinking green shadow on all interactive boxes) ----- */
         .map-container { display: none; flex-direction: column; height: 100vh; font-family: Arial, sans-serif; }
         .top-bar {
             background: url('zitf.jpg') center/cover no-repeat;
@@ -45,13 +49,43 @@
             text-shadow: 1px 1px 2px black;
         }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
-        .gps-indicator { background: rgba(0,0,0,0.7); padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; }
+        
+        /* Blinking shadow animation (same as markers) */
+        @keyframes neonPulse {
+            0% { filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44); }
+            50% { filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44); }
+            100% { filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44); }
+        }
+        .blinking-ui {
+            animation: neonPulse 0.9s infinite ease-in-out;
+            transition: all 0.2s;
+        }
+        
+        /* Apply blinking to search bar, GPS indicator, navigation panel, legend */
         .geojson-search {
             background: white; border-radius: 40px; padding: 4px 12px;
             display: flex; gap: 6px; align-items: center;
+            animation: neonPulse 0.9s infinite ease-in-out;
         }
         .geojson-search input { border: none; padding: 8px 12px; width: 200px; border-radius: 40px; outline: none; }
         .geojson-search button { background: #ffaa33; border: none; padding: 6px 18px; border-radius: 40px; font-weight: bold; cursor: pointer; }
+        
+        .gps-indicator {
+            background: rgba(0,0,0,0.7);
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            animation: neonPulse 0.9s infinite ease-in-out;
+        }
+        
+        /* Leaflet legend (layer control) – target the container */
+        .leaflet-control-layers {
+            animation: neonPulse 0.9s infinite ease-in-out;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
         .search-results {
             position: absolute; top: 70px; right: 20px;
             background: white; color: black; border-radius: 12px;
@@ -60,34 +94,42 @@
         }
         .search-results div { padding: 8px 12px; border-bottom: 1px solid #ccc; cursor: pointer; }
         .search-results div:hover { background: #f0f0f0; }
+        
+        /* Draggable Navigation Panel – also blinking */
         .nav-panel {
             position: absolute; top: 80px; left: 10px;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-            padding: 15px; border-radius: 20px; width: 280px;
-            z-index: 1000; color: white; border-left: 4px solid #00ff88;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            padding: 15px;
+            border-radius: 20px;
+            width: 280px;
+            z-index: 1000;
+            color: white;
+            border-left: 4px solid #00ff88;
+            cursor: default;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            animation: neonPulse 0.9s infinite ease-in-out;
         }
-        .nav-panel h3 { margin-bottom: 10px; color: #88ffaa; }
+        .nav-panel.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+        }
+        .nav-panel h3 {
+            margin-bottom: 10px;
+            color: #88ffaa;
+            cursor: grab;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-panel h3:active { cursor: grabbing; }
+        .drag-handle {
+            font-size: 1.2rem;
+            margin-right: 5px;
+        }
         .nav-panel input { width: 100%; padding: 10px; border-radius: 30px; border: none; margin: 8px 0; }
         .nav-panel button { width: 100%; background: #00cc66; border: none; padding: 10px; border-radius: 30px; font-weight: bold; cursor: pointer; }
-        .directions-card {
-            position: absolute; bottom: 20px; right: 20px; width: 310px; max-height: 360px;
-            background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); border-radius: 20px; padding: 12px;
-            color: #f0f0f0; font-size: 13px; z-index: 1000; border-left: 5px solid #00ff88;
-            overflow-y: auto; display: none;
-        }
-        .directions-card h4 { display: flex; justify-content: space-between; color: #88ffaa; }
-        .close-dir { background: #aa3333; padding: 2px 10px; border-radius: 30px; cursor: pointer; }
-        .step { padding: 8px 0; border-bottom: 1px solid #444; display: flex; gap: 8px; }
-        @keyframes neonPulse {
-            0% { filter: drop-shadow(0 0 0px #00ff66); }
-            50% { filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44); }
-            100% { filter: drop-shadow(0 0 0px #00ff66); }
-        }
-        .blinking-icon { animation: neonPulse 0.9s infinite ease-in-out; }
-        .leaflet-marker-icon { transition: transform 0.2s, filter 0.2s; cursor: pointer; }
-        .leaflet-marker-icon:hover { transform: scale(1.25) translateY(-5px); filter: drop-shadow(0 0 16px #00ffaa) !important; z-index: 10000; }
-        .route-line { stroke: #2a7fff; stroke-width: 5; stroke-dasharray: 8 4; }
-        #map { flex: 1; width: 100%; background: #cfe3cf; }
         .selected-dest {
             font-size: 0.8rem;
             color: #88ffaa;
@@ -97,6 +139,34 @@
             border-radius: 8px;
             text-align: center;
         }
+        .drag-hint {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 8px;
+            color: #aaa;
+        }
+        
+        .directions-card {
+            position: absolute; bottom: 20px; right: 20px; width: 310px; max-height: 360px;
+            background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); border-radius: 20px; padding: 12px;
+            color: #f0f0f0; font-size: 13px; z-index: 1000; border-left: 5px solid #00ff88;
+            overflow-y: auto; display: none;
+        }
+        .directions-card h4 { display: flex; justify-content: space-between; color: #88ffaa; }
+        .close-dir { background: #aa3333; padding: 2px 10px; border-radius: 30px; cursor: pointer; }
+        .step { padding: 8px 0; border-bottom: 1px solid #444; display: flex; gap: 8px; }
+        
+        /* Marker blinking (unchanged) */
+        @keyframes neonPulseMarker {
+            0% { filter: drop-shadow(0 0 0px #00ff66); }
+            50% { filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44); }
+            100% { filter: drop-shadow(0 0 0px #00ff66); }
+        }
+        .blinking-icon { animation: neonPulseMarker 0.9s infinite ease-in-out; }
+        .leaflet-marker-icon { transition: transform 0.2s, filter 0.2s; cursor: pointer; }
+        .leaflet-marker-icon:hover { transform: scale(1.25) translateY(-5px); filter: drop-shadow(0 0 16px #00ffaa) !important; z-index: 10000; }
+        .route-line { stroke: #2a7fff; stroke-width: 5; stroke-dasharray: 8 4; }
+        #map { flex: 1; width: 100%; background: #cfe3cf; }
     </style>
 </head>
 <body>
@@ -117,7 +187,7 @@
     <div class="top-bar">
         <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
         <div class="geojson-search">
-            <input type="text" id="geoSearchInput" placeholder="🔍 Search layers (toilets, halls, etc.)" autocomplete="off">
+            <input type="text" id="geoSearchInput" placeholder="🔍 Search layers (toilets, halls...)" autocomplete="off">
             <button id="geoSearchBtn">SEARCH</button>
         </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
@@ -125,10 +195,11 @@
     <div id="map"></div>
     <div id="searchResults" class="search-results"></div>
     <div id="navPanel" class="nav-panel">
-        <h3>🧭 NAVIGATION OPTION</h3>
+        <h3><span class="drag-handle">⣿</span> 🧭 NAVIGATION OPTION</h3>
         <input type="text" id="navSearchInput" placeholder="Search bank, atm, food..." value="bank">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
         <div id="selectedDestInfo" class="selected-dest">No destination selected</div>
+        <div class="drag-hint">(Drag the ⣿ handle to move)</div>
     </div>
     <div id="directionsPanel" class="directions-card">
         <h4>🚶 TURN-BY-TURN <span class="close-dir" id="closeDirBtn">✖ CLOSE</span></h4>
@@ -154,7 +225,7 @@
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         
-        // ========== COMPLETE LIST OF ALL YOUR GEOJSON FILES ==========
+        // ========== COMPLETE LIST OF GEOJSON FILES ==========
         const geojsonFiles = [
             "ZITF BOUNDARY.geojson",
             "NATIONAL SECURITY FORCES.geojson",
@@ -270,9 +341,9 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== GPS & ROUTING (shared) ==========
+        // ========== GPS & ROUTING ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
-        let selectedDestination = null; // Stores the destination from search results or venue search
+        let selectedDestination = null;
         
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
@@ -335,7 +406,6 @@
             container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total: ${Math.round(totalDist)} m</div>`;
         }
         
-        // Navigation function that uses the currently selected destination
         async function navigateToDestination(destLatLng, destName) {
             let userPos = currentPosition;
             if (!userPos) {
@@ -358,7 +428,6 @@
             }
         }
         
-        // Search for hardcoded venues (banks, food, etc.) – fallback if no GeoJSON selected
         async function searchAndNavigateVenue(keyword) {
             if (!keyword.trim()) { alert("Enter a destination"); return; }
             const matches = markersArray.filter(m => m.poiData.name.toLowerCase().includes(keyword.toLowerCase()) || m.poiData.type.toLowerCase().includes(keyword.toLowerCase()));
@@ -379,19 +448,16 @@
             await navigateToDestination(destLatLng, destName);
         }
         
-        // Main navigation trigger (called by GET DIRECTIONS button)
         async function handleNavigation() {
             if (selectedDestination) {
-                // Use selected destination from search results
                 await navigateToDestination(selectedDestination.latlng, selectedDestination.name);
             } else {
-                // Otherwise fallback to searching the "navSearchInput" (banks, food, etc.)
                 const keyword = document.getElementById('navSearchInput').value.trim();
                 await searchAndNavigateVenue(keyword);
             }
         }
         
-        // ========== SEARCH BOX FOR ALL GEOJSON LAYERS (now also sets destination) ==========
+        // ========== SEARCH BOX (GeoJSON layers) ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -421,20 +487,17 @@
                     const match = matches[idx];
                     if (match && match.bounds.isValid()) {
                         map.fitBounds(match.bounds);
-                        // Store as selected destination
                         const center = match.bounds.getCenter();
                         selectedDestination = {
                             latlng: center,
                             name: match.feature.properties.name || match.feature.properties.Name || `Feature from ${match.source}`
                         };
                         selectedDestInfo.innerHTML = `📍 Selected: ${selectedDestination.name} (click GET DIRECTIONS)`;
-                        // Highlight the feature temporarily
                         if (match.layer.setStyle) {
                             const orig = match.layer.options.style;
                             match.layer.setStyle({ color: '#ffff00', weight: 6 });
                             setTimeout(() => match.layer.setStyle(orig), 1500);
                         }
-                        // Optionally add a marker at the destination
                         if (destMarker) map.removeLayer(destMarker);
                         destMarker = L.marker(center, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${selectedDestination.name}</b><br>Selected destination`).openPopup();
                     }
@@ -450,17 +513,51 @@
                 resultsDiv.style.display = 'none';
         });
         
-        // Hook the GET DIRECTIONS button to use the new handler
         navGoBtn.addEventListener('click', handleNavigation);
         document.getElementById('navSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleNavigation(); });
         document.getElementById('closeDirBtn').addEventListener('click', () => {
             document.getElementById('directionsPanel').style.display = 'none';
             if (currentRoute) map.removeLayer(currentRoute);
-            if (destMarker && !selectedDestination) map.removeLayer(destMarker); // keep dest marker if selected
+            if (destMarker && !selectedDestination) map.removeLayer(destMarker);
             currentRoute = null;
         });
         
         updateGPSIndicator();
+        
+        // ========== DRAGGABLE NAVIGATION PANEL ==========
+        const navPanel = document.getElementById('navPanel');
+        const dragHandle = navPanel.querySelector('h3');
+        let isDragging = false;
+        let offsetX, offsetY;
+        
+        dragHandle.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.drag-handle') || e.target === dragHandle || dragHandle.contains(e.target)) {
+                isDragging = true;
+                offsetX = e.clientX - navPanel.offsetLeft;
+                offsetY = e.clientY - navPanel.offsetTop;
+                navPanel.classList.add('dragging');
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let newLeft = e.clientX - offsetX;
+            let newTop = e.clientY - offsetY;
+            newLeft = Math.min(Math.max(newLeft, 5), window.innerWidth - navPanel.offsetWidth - 5);
+            newTop = Math.min(Math.max(newTop, 5), window.innerHeight - navPanel.offsetHeight - 5);
+            navPanel.style.left = newLeft + 'px';
+            navPanel.style.top = newTop + 'px';
+            navPanel.style.right = 'auto';
+            navPanel.style.bottom = 'auto';
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                navPanel.classList.remove('dragging');
+            }
+        });
     }
 </script>
 </body>
