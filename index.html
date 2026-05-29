@@ -88,6 +88,15 @@
         .leaflet-marker-icon:hover { transform: scale(1.25) translateY(-5px); filter: drop-shadow(0 0 16px #00ffaa) !important; z-index: 10000; }
         .route-line { stroke: #2a7fff; stroke-width: 5; stroke-dasharray: 8 4; }
         #map { flex: 1; width: 100%; background: #cfe3cf; }
+        .selected-dest {
+            font-size: 0.8rem;
+            color: #88ffaa;
+            margin-top: 5px;
+            background: #2a2a2a;
+            padding: 4px;
+            border-radius: 8px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -108,7 +117,7 @@
     <div class="top-bar">
         <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
         <div class="geojson-search">
-            <input type="text" id="geoSearchInput" placeholder="🔍 Search layers" autocomplete="off">
+            <input type="text" id="geoSearchInput" placeholder="🔍 Search layers (toilets, halls, etc.)" autocomplete="off">
             <button id="geoSearchBtn">SEARCH</button>
         </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
@@ -119,6 +128,7 @@
         <h3>🧭 NAVIGATION OPTION</h3>
         <input type="text" id="navSearchInput" placeholder="Search bank, atm, food..." value="bank">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
+        <div id="selectedDestInfo" class="selected-dest">No destination selected</div>
     </div>
     <div id="directionsPanel" class="directions-card">
         <h4>🚶 TURN-BY-TURN <span class="close-dir" id="closeDirBtn">✖ CLOSE</span></h4>
@@ -127,7 +137,6 @@
 </div>
 
 <script>
-    // ========== LOGIN ==========
     document.getElementById('loginBtn').addEventListener('click', function() {
         const user = document.getElementById('loginUsername').value.trim();
         const pwd = document.getElementById('loginPassword').value.trim();
@@ -145,7 +154,7 @@
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         
-        // ========== LIST OF ALL YOUR GEOJSON FILES ==========
+        // ========== COMPLETE LIST OF ALL YOUR GEOJSON FILES ==========
         const geojsonFiles = [
             "ZITF BOUNDARY.geojson",
             "NATIONAL SECURITY FORCES.geojson",
@@ -170,14 +179,13 @@
             "BOUNDARY.geojson",
             "TELECOM & MOBILE NETWORK PROVIDERS.geojson",
             "ROADS.geojson",
-            "TRANSPORT & TRAVELING.geojson"
+            "TRANSPORT & TRAVELING.geojson",
+            "TOILETS.geojson"
         ];
         
-        // Store layers for legend and search
         const overlayLayers = {};
         let allFeatures = []; // for search index
         
-        // Helper: generate a random colour for each layer (optional)
         function getRandomColor() {
             const letters = '0123456789ABCDEF';
             let color = '#';
@@ -185,29 +193,22 @@
             return color;
         }
         
-        // Load each file
         for (const file of geojsonFiles) {
             try {
                 const response = await fetch(file);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
-                // Validate GeoJSON structure
-                if (!data.features || !Array.isArray(data.features)) {
-                    throw new Error("Invalid GeoJSON (no features array)");
-                }
-                // Assign a style – for lines use a different default
+                if (!data.features || !Array.isArray(data.features)) throw new Error("Invalid GeoJSON");
                 let style;
                 if (file.toLowerCase().includes("road")) {
                     style = { color: "#db1e2a", weight: 2.5, opacity: 0.8, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" };
                 } else if (file.toLowerCase().includes("boundary")) {
                     style = { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" };
                 } else {
-                    // default: random colour with some opacity
                     style = { color: getRandomColor(), weight: 2, fillOpacity: 0.2 };
                 }
                 const layer = L.geoJSON(data, { style }).addTo(map);
                 overlayLayers[file] = layer;
-                // Index features for search
                 data.features.forEach(f => {
                     allFeatures.push({
                         layer: layer,
@@ -222,14 +223,10 @@
             }
         }
         
-        // Add base layers and overlay control (legend)
-        const baseLayers = {
-            "🗺️ Roads": roadLayer,
-            "🛰️ Satellite": satelliteLayer
-        };
+        const baseLayers = { "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer };
         L.control.layers(baseLayers, overlayLayers, { position: 'bottomright' }).addTo(map);
         
-        // ========== VENUES (banks, food, etc.) ==========
+        // ========== VENUES (hardcoded POIs) ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -273,8 +270,10 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== GPS & ROUTING (same as before, fully working) ==========
+        // ========== GPS & ROUTING (shared) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
+        let selectedDestination = null; // Stores the destination from search results or venue search
+        
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) reject("Geolocation not supported");
@@ -335,54 +334,69 @@
             });
             container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total: ${Math.round(totalDist)} m</div>`;
         }
-        async function searchAndNavigate(keyword) {
+        
+        // Navigation function that uses the currently selected destination
+        async function navigateToDestination(destLatLng, destName) {
+            let userPos = currentPosition;
+            if (!userPos) {
+                userPos = await updateGPSIndicator();
+                if (!userPos) { alert("Cannot get your location. Enable GPS."); return false; }
+            }
+            if (destMarker) map.removeLayer(destMarker);
+            destMarker = L.marker(destLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${destName}</b><br>Destination`).openPopup();
+            try {
+                const route = await fetchRoute(userPos, [destLatLng.lat, destLatLng.lng]);
+                drawBlueRoute(route.geometry);
+                renderSteps(route);
+                if (currentRoute) map.fitBounds(currentRoute.getBounds());
+                return true;
+            } catch(err) {
+                alert("Routing error: " + err.message);
+                document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create route</div>`;
+                document.getElementById('directionsPanel').style.display = 'block';
+                return false;
+            }
+        }
+        
+        // Search for hardcoded venues (banks, food, etc.) – fallback if no GeoJSON selected
+        async function searchAndNavigateVenue(keyword) {
             if (!keyword.trim()) { alert("Enter a destination"); return; }
             const matches = markersArray.filter(m => m.poiData.name.toLowerCase().includes(keyword.toLowerCase()) || m.poiData.type.toLowerCase().includes(keyword.toLowerCase()));
-            if (matches.length === 0) { alert(`No "${keyword}" found.`); return; }
+            if (matches.length === 0) { alert(`No venue "${keyword}" found. Use the search box above to find toilets, halls, etc.`); return; }
             let target = matches[0];
             if (matches.length > 1) {
                 const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
-                const sel = prompt(`Multiple matches:\n${list}\nEnter number (1-${matches.length})`, "1");
+                const sel = prompt(`Multiple venues:\n${list}\nEnter number (1-${matches.length})`, "1");
                 if (!sel) return;
                 const idx = parseInt(sel)-1;
                 if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid"); return; }
                 target = matches[idx];
             }
-            let userPos = currentPosition;
-            if (!userPos) {
-                userPos = await updateGPSIndicator();
-                if (!userPos) { alert("Cannot get your location."); return; }
-            }
-            const tgtLatLng = target.getLatLng();
-            if (destMarker) map.removeLayer(destMarker);
-            destMarker = L.marker(tgtLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${target.poiData.name}</b><br>Destination`).openPopup();
-            try {
-                const route = await fetchRoute(userPos, [tgtLatLng.lat, tgtLatLng.lng]);
-                drawBlueRoute(route.geometry);
-                renderSteps(route);
-                if (currentRoute) map.fitBounds(currentRoute.getBounds());
-            } catch(err) {
-                alert("Routing error: " + err.message);
-                document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create route</div>`;
-                document.getElementById('directionsPanel').style.display = 'block';
+            const destLatLng = target.getLatLng();
+            const destName = target.poiData.name;
+            selectedDestination = { latlng: destLatLng, name: destName };
+            document.getElementById('selectedDestInfo').innerHTML = `📍 Selected: ${destName}`;
+            await navigateToDestination(destLatLng, destName);
+        }
+        
+        // Main navigation trigger (called by GET DIRECTIONS button)
+        async function handleNavigation() {
+            if (selectedDestination) {
+                // Use selected destination from search results
+                await navigateToDestination(selectedDestination.latlng, selectedDestination.name);
+            } else {
+                // Otherwise fallback to searching the "navSearchInput" (banks, food, etc.)
+                const keyword = document.getElementById('navSearchInput').value.trim();
+                await searchAndNavigateVenue(keyword);
             }
         }
         
-        document.getElementById('navGoBtn').addEventListener('click', () => searchAndNavigate(document.getElementById('navSearchInput').value.trim()));
-        document.getElementById('navSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('navGoBtn').click(); });
-        document.getElementById('closeDirBtn').addEventListener('click', () => {
-            document.getElementById('directionsPanel').style.display = 'none';
-            if (currentRoute) map.removeLayer(currentRoute);
-            if (destMarker) map.removeLayer(destMarker);
-            currentRoute = null; destMarker = null;
-        });
-        
-        updateGPSIndicator();
-        
-        // ========== SEARCH BOX FOR ALL GEOJSON LAYERS ==========
+        // ========== SEARCH BOX FOR ALL GEOJSON LAYERS (now also sets destination) ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
+        const navGoBtn = document.getElementById('navGoBtn');
+        const selectedDestInfo = document.getElementById('selectedDestInfo');
         
         function performSearch() {
             const query = searchInput.value.trim().toLowerCase();
@@ -407,23 +421,46 @@
                     const match = matches[idx];
                     if (match && match.bounds.isValid()) {
                         map.fitBounds(match.bounds);
-                        // flash highlight
+                        // Store as selected destination
+                        const center = match.bounds.getCenter();
+                        selectedDestination = {
+                            latlng: center,
+                            name: match.feature.properties.name || match.feature.properties.Name || `Feature from ${match.source}`
+                        };
+                        selectedDestInfo.innerHTML = `📍 Selected: ${selectedDestination.name} (click GET DIRECTIONS)`;
+                        // Highlight the feature temporarily
                         if (match.layer.setStyle) {
                             const orig = match.layer.options.style;
                             match.layer.setStyle({ color: '#ffff00', weight: 6 });
                             setTimeout(() => match.layer.setStyle(orig), 1500);
                         }
+                        // Optionally add a marker at the destination
+                        if (destMarker) map.removeLayer(destMarker);
+                        destMarker = L.marker(center, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${selectedDestination.name}</b><br>Selected destination`).openPopup();
                     }
                     resultsDiv.style.display = 'none';
                 });
             });
         }
+        
         searchBtn.addEventListener('click', performSearch);
         searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
         document.addEventListener('click', (e) => {
             if (!resultsDiv.contains(e.target) && e.target !== searchInput && e.target !== searchBtn)
                 resultsDiv.style.display = 'none';
         });
+        
+        // Hook the GET DIRECTIONS button to use the new handler
+        navGoBtn.addEventListener('click', handleNavigation);
+        document.getElementById('navSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleNavigation(); });
+        document.getElementById('closeDirBtn').addEventListener('click', () => {
+            document.getElementById('directionsPanel').style.display = 'none';
+            if (currentRoute) map.removeLayer(currentRoute);
+            if (destMarker && !selectedDestination) map.removeLayer(destMarker); // keep dest marker if selected
+            currentRoute = null;
+        });
+        
+        updateGPSIndicator();
     }
 </script>
 </body>
