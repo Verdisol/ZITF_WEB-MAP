@@ -1,8 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "TRASNPORT & TRAVELLING",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::20935" } },
-"features": [
-{ "type": "Feature", "properties": { "id": null, "Name": "Airport Of Zimbabwe", "Proximity": "Hall 3" }, "geometry": { "type": "Point", "coordinates": [ 666073.59677182068117, 7769385.976710375398397 ] } }
-]
-}
