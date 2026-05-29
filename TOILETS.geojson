@@ -1,0 +1,18 @@
+{
+"type": "FeatureCollection",
+"name": "TOILETS",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "Gender": "Gentlemen", "Proximity": "Hall 3", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588482934114641, -20.169326362113498 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Gentlemen", "Proximity": "Hall 3", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588378676137463, -20.169164043706918 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Ladies", "Proximity": "Hall 3", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588290269070228, -20.169040074250038 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Gentlemen", "Proximity": "Hall 4", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588214786599764, -20.169578137229635 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Ladies", "Proximity": "Hall 4", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588267994406436, -20.169676263704808 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Gentlemen", "Proximity": "Hall 2", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588907877865854, -20.16645589984439 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Ladies", "Proximity": "Hall 2", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588896899147443, -20.166493542874523 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Ladies", "Proximity": "Hall 1", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588660996601295, -20.165523325484575 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Gentlemen", "Proximity": "Hall 1", "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.588630460585847, -20.165573125815708 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Gentlemen", "Proximity": null, "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.589824478509488, -20.167795621671278 ] } },
+{ "type": "Feature", "properties": { "id": null, "Gender": "Ladies", "Proximity": null, "Capacity": null }, "geometry": { "type": "Point", "coordinates": [ 28.589825049132262, -20.16785193233401 ] } }
+]
+}
