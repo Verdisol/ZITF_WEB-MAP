@@ -1,0 +1,11 @@
+{
+"type": "FeatureCollection",
+"name": "FOOD PRODUCTION SECTOR",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "Name": "Nestle", "Proximity": "Hall 3" }, "geometry": { "type": "Point", "coordinates": [ 28.588402388495719, -20.169348656796057 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Schweppes Beverage", "Proximity": "Hall 3" }, "geometry": { "type": "Point", "coordinates": [ 28.588137251274489, -20.168902387145362 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Gold Star Foods", "Proximity": "Tel One Telecommunications" }, "geometry": { "type": "Point", "coordinates": [ 28.588774946961866, -20.167326755078708 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Delta Beverages", "Proximity": "Croco Motors" }, "geometry": { "type": "Point", "coordinates": [ 28.587650556521591, -20.165891230477627 ] } }
+]
+}

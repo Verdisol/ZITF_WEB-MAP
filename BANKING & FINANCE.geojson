@@ -1,0 +1,14 @@
+{
+"type": "FeatureCollection",
+"name": "BANKING & FINANCE",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "Name": "Old Mutual Group", "Proximity": "Tel One Telecommunications" }, "geometry": { "type": "Point", "coordinates": [ 28.588689810785088, -20.167298007284025 ] } },
+{ "type": "Feature", "properties": { "Name": "FBC Bank", "Proximity": "Tel One Telecommunications" }, "geometry": { "type": "Point", "coordinates": [ 28.588840139557057, -20.167370441152208 ] } },
+{ "type": "Feature", "properties": { "Name": "ZB Bank", "Proximity": "Hall 3" }, "geometry": { "type": "Point", "coordinates": [ 28.588740923519801, -20.168525725532184 ] } },
+{ "type": "Feature", "properties": { "Name": "AFC Bank", "Proximity": "Parliament Of Zimbabwe" }, "geometry": { "type": "Point", "coordinates": [ 28.587861208618758, -20.167382435660311 ] } },
+{ "type": "Feature", "properties": { "Name": "First Capital Bank", "Proximity": "City Of Gwanda" }, "geometry": { "type": "Point", "coordinates": [ 28.587557167283148, -20.168036902956636 ] } },
+{ "type": "Feature", "properties": { "Name": "POSB Bank", "Proximity": "First Capital Bank" }, "geometry": { "type": "Point", "coordinates": [ 28.587603027474312, -20.167858709770737 ] } },
+{ "type": "Feature", "properties": { "Name": "CBZ Bank", "Proximity": "NetOne Telecommunications" }, "geometry": { "type": "Point", "coordinates": [ 28.588284966329123, -20.16692414852437 ] } }
+]
+}

@@ -1,0 +1,16 @@
+{
+"type": "FeatureCollection",
+"name": "GOVERNMENT DEPTS & MINISTRIES",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "Name": "Zimbabwe National Water Authority", "Proximity": "People's Own Savings Bank" }, "geometry": { "type": "Point", "coordinates": [ 28.587663555879075, -20.167718518369679 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Office Of The President", "Proximity": "Minerals Marketing Corporation Of Zimbabwe" }, "geometry": { "type": "Point", "coordinates": [ 28.587402798078593, -20.168291647932236 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Ministry Of Foreign Affairs & International Trade", "Proximity": "Office Of The President" }, "geometry": { "type": "Point", "coordinates": [ 28.587213708289578, -20.168093453282602 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Ministry Of Environment, Climate, Tourism & Hospitality Industry Parks", "Proximity": "Hall 3" }, "geometry": { "type": "Point", "coordinates": [ 28.588836248744069, -20.168687909640123 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Parliament Of Zimbabwe", "Proximity": "City Of Harare" }, "geometry": { "type": "Point", "coordinates": [ 28.58775643323311, -20.167481563854317 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Ministry Of Energy & Power Development", "Proximity": "CIMAS" }, "geometry": { "type": "Point", "coordinates": [ 28.587791118139659, -20.167058324602827 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "National Railwaays Of Zimbabwe", "Proximity": "First Capital Bank" }, "geometry": { "type": "Point", "coordinates": [ 28.587798139037329, -20.168136543521623 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Ministry Of Economic Development", "Proximity": "Procurement Regulatory Authority Of Zimbabwe" }, "geometry": { "type": "Point", "coordinates": [ 28.588317294309014, -20.166690064808606 ] } },
+{ "type": "Feature", "properties": { "id": null, "Name": "Zimbabwe Anti-Corruption Commission", "Proximity": "Hall 1" }, "geometry": { "type": "Point", "coordinates": [ 28.588185790936436, -20.16641262561221 ] } }
+]
+}
