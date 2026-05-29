@@ -10,7 +10,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; height: 100vh; background: #1e3a2f; }
         
-        /* LOGIN PAGE: ONLY zitf.jpg – no green, no overlay */
+        /* LOGIN: only zitf.jpg */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
@@ -111,7 +111,7 @@
     <div class="top-bar">
         <h1>📍 ZITF NAVIGATION LIVE MAP</h1>
         <div class="geojson-search">
-            <input type="text" id="geoSearchInput" placeholder="🔍 Search GeoJSON (road, boundary...)" autocomplete="off">
+            <input type="text" id="geoSearchInput" placeholder="🔍 Search GeoJSON" autocomplete="off">
             <button id="geoSearchBtn">SEARCH</button>
         </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
@@ -121,9 +121,8 @@
     
     <div id="navPanel" class="nav-panel">
         <h3>🧭 NAVIGATION OPTION</h3>
-        <input type="text" id="navSearchInput" placeholder="Search destination (bank, atm, food...)" value="bank">
+        <input type="text" id="navSearchInput" placeholder="Search bank, atm, food..." value="bank">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
-        <div class="dest-suggest">e.g., bank, atm, food, info</div>
     </div>
     
     <div id="directionsPanel" class="directions-card">
@@ -146,78 +145,101 @@
         }
     });
 
-    // ========== MAP INITIALIZATION ==========
     async function initMap() {
+        console.clear();
+        console.log("🟢 INITIALIZING MAP...");
+        
         const roadLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' });
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'topright' }).addTo(map);
         
-        // ========== STORE FOR GEOJSON FEATURES (for searching) ==========
+        // Store for search
         let geoJsonFeatures = [];
         
-        // ========== 1. BOUNDARY LAYER (try external file, fallback to inline) ==========
-        let boundaryLayer;
+        // ========== 1. ZITF BOUNDARY.GEOJSON with detailed logging ==========
+        console.log("→ Attempting to load ZITF BOUNDARY.geojson...");
         try {
-            const resp = await fetch('ZITF BOUNDARY.geojson');
-            if (resp.ok) {
-                const data = await resp.json();
-                boundaryLayer = L.geoJSON(data, {
-                    style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
-                }).addTo(map);
-                // add features to search index
-                if (data.features) {
-                    data.features.forEach(f => {
-                        geoJsonFeatures.push({ layer: boundaryLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ZITF BOUNDARY' });
-                    });
-                }
-                console.log("✅ Loaded external ZITF BOUNDARY.geojson");
-            } else {
-                throw new Error("File not found");
+            const response = await fetch('ZITF BOUNDARY.geojson');
+            console.log(`   Fetch status: ${response.status} ${response.statusText}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status} - file not found or inaccessible`);
             }
+            const boundaryData = await response.json();
+            console.log("   ✓ File loaded, parsing GeoJSON...");
+            
+            // Check if GeoJSON has features
+            if (!boundaryData.features || boundaryData.features.length === 0) {
+                throw new Error("GeoJSON has no features");
+            }
+            
+            // Add boundary with BRIGHT style so it's very visible
+            const boundaryLayer = L.geoJSON(boundaryData, {
+                style: { color: "#ff6600", weight: 4, fillOpacity: 0.3, fillColor: "#ffaa44" }
+            }).addTo(map);
+            console.log(`✅ SUCCESS: ZITF BOUNDARY loaded with ${boundaryData.features.length} features`);
+            
+            // Add to search index
+            boundaryData.features.forEach(f => {
+                geoJsonFeatures.push({
+                    layer: boundaryLayer,
+                    feature: f,
+                    bounds: L.geoJSON(f).getBounds(),
+                    source: 'ZITF BOUNDARY'
+                });
+            });
+            
+            // Zoom to boundary bounds
+            const bounds = boundaryLayer.getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds);
+            
         } catch (err) {
-            console.warn("Could not load ZITF BOUNDARY.geojson, using inline fallback");
-            // Inline fallback boundary (a simple rectangle around ZITF area)
+            console.error(`❌ FAILED to load ZITF BOUNDARY.geojson: ${err.message}`);
+            console.warn("   → Using FALLBACK boundary (bright orange rectangle)");
+            
+            // Fallback boundary – large, visible rectangle
             const fallbackBoundary = {
                 "type": "FeatureCollection",
                 "features": [{
                     "type": "Feature",
-                    "properties": { "name": "ZITF Grounds (Fallback)" },
+                    "properties": { "name": "ZITF Grounds (FALLBACK - check file)" },
                     "geometry": {
                         "type": "Polygon",
-                        "coordinates": [[[-20.1400,28.6200],[-20.1250,28.6200],[-20.1250,28.6350],[-20.1400,28.6350],[-20.1400,28.6200]]]
+                        "coordinates": [[[-20.1450,28.6150],[-20.1200,28.6150],[-20.1200,28.6400],[-20.1450,28.6400],[-20.1450,28.6150]]]
                     }
                 }]
             };
-            boundaryLayer = L.geoJSON(fallbackBoundary, {
-                style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
+            const fallbackLayer = L.geoJSON(fallbackBoundary, {
+                style: { color: "#ff0000", weight: 5, fillOpacity: 0.4, fillColor: "#ff8800" }
             }).addTo(map);
             fallbackBoundary.features.forEach(f => {
-                geoJsonFeatures.push({ layer: boundaryLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Boundary (fallback)' });
+                geoJsonFeatures.push({ layer: fallbackLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Boundary (FALLBACK)' });
             });
+            
+            // Also add a popup explaining the issue
+            L.popup()
+                .setLatLng([-20.1325, 28.6272])
+                .setContent("⚠️ <b>ZITF BOUNDARY.geojson not found</b><br>Using fallback rectangle.<br>Check console for details.")
+                .openOn(map);
         }
         
-        // ========== 2. ROADS LAYER (try external ROADS.geojson, fallback to inline) ==========
-        let roadsLayer;
+        // ========== 2. ROADS (external or fallback) ==========
+        console.log("→ Attempting to load ROADS.geojson...");
         try {
             const resp = await fetch('ROADS.geojson');
-            if (resp.ok) {
-                const data = await resp.json();
-                roadsLayer = L.geoJSON(data, {
-                    style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
-                }).addTo(map);
-                if (data.features) {
-                    data.features.forEach(f => {
-                        geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ROADS' });
-                    });
-                }
-                console.log("✅ Loaded external ROADS.geojson");
-            } else {
-                throw new Error("File not found");
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const roadsData = await resp.json();
+            const roadsLayer = L.geoJSON(roadsData, {
+                style: { color: "#db1e2a", weight: 3, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
+            }).addTo(map);
+            if (roadsData.features) {
+                roadsData.features.forEach(f => {
+                    geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ROADS' });
+                });
             }
+            console.log(`✅ ROADS.geojson loaded (${roadsData.features?.length || 0} features)`);
         } catch (err) {
-            console.warn("Could not load ROADS.geojson, using inline fallback roads (with QGIS red dashed style)");
-            // Inline roads with the exact QGIS style: red, dashed, round caps
+            console.warn(`⚠️ ROADS.geojson not found, using inline roads`);
             const inlineRoads = {
                 "type": "FeatureCollection",
                 "features": [
@@ -226,15 +248,15 @@
                     { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
                 ]
             };
-            roadsLayer = L.geoJSON(inlineRoads, {
-                style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
+            const roadsLayer = L.geoJSON(inlineRoads, {
+                style: { color: "#db1e2a", weight: 3, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
             }).addTo(map);
             inlineRoads.features.forEach(f => {
                 geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads (inline)' });
             });
         }
         
-        // ========== 3. SEARCH FUNCTION FOR GEOJSON LAYERS ==========
+        // ========== 3. SEARCH FUNCTION ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -245,12 +267,10 @@
             const matches = geoJsonFeatures.filter(item => {
                 const props = item.feature.properties;
                 if (!props) return false;
-                return Object.values(props).some(val => 
-                    val && val.toString().toLowerCase().includes(query)
-                );
+                return Object.values(props).some(val => val && val.toString().toLowerCase().includes(query));
             });
             if (matches.length === 0) {
-                resultsDiv.innerHTML = '<div style="padding:8px;">No matches found</div>';
+                resultsDiv.innerHTML = '<div style="padding:8px;">No matches</div>';
                 resultsDiv.style.display = 'block';
                 return;
             }
@@ -259,23 +279,17 @@
                 return `<div data-idx="${idx}">📍 ${label} (${match.source})</div>`;
             }).join('');
             resultsDiv.style.display = 'block';
-            // attach click handlers
             document.querySelectorAll('#searchResults div[data-idx]').forEach(div => {
                 div.addEventListener('click', (e) => {
                     const idx = parseInt(div.getAttribute('data-idx'));
                     const match = matches[idx];
                     if (match && match.bounds.isValid()) {
                         map.fitBounds(match.bounds);
-                        // temporary highlight
+                        // highlight
                         if (match.layer && match.layer.setStyle) {
-                            const originalStyle = match.layer.options.style;
-                            match.layer.setStyle({ color: '#ffff00', weight: 5, opacity: 1 });
-                            setTimeout(() => {
-                                if (match.source.includes('BOUNDARY'))
-                                    match.layer.setStyle({ color: "#ff6600", weight: 3, fillOpacity: 0.1 });
-                                else
-                                    match.layer.setStyle({ color: "#db1e2a", weight: 2.5, dashArray: "4,12" });
-                            }, 1500);
+                            const orig = match.layer.options.style;
+                            match.layer.setStyle({ color: '#ffff00', weight: 6 });
+                            setTimeout(() => match.layer.setStyle(orig), 1500);
                         }
                     }
                     resultsDiv.style.display = 'none';
@@ -286,12 +300,11 @@
         searchBtn.addEventListener('click', performSearch);
         searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
         document.addEventListener('click', (e) => {
-            if (!resultsDiv.contains(e.target) && e.target !== searchInput && e.target !== searchBtn) {
+            if (!resultsDiv.contains(e.target) && e.target !== searchInput && e.target !== searchBtn)
                 resultsDiv.style.display = 'none';
-            }
         });
         
-        // ========== 4. VENUES (POI markers with blinking & hover) ==========
+        // ========== 4. VENUES (banks, etc.) with blinking ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -335,7 +348,7 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== 5. GPS & ROUTING (unchanged) ==========
+        // ========== 5. GPS & ROUTING (unchanged, working) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
@@ -367,7 +380,7 @@
             const url = `https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
             const resp = await fetch(url);
             const data = await resp.json();
-            if (data.code !== 'Ok') throw new Error("No walkable route found");
+            if (data.code !== 'Ok') throw new Error("No walkable route");
             return data.routes[0];
         }
         function drawBlueRoute(geojson) {
@@ -395,25 +408,25 @@
                     container.appendChild(stepDiv);
                 });
             });
-            container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total distance: ${Math.round(totalDist)} meters</div>`;
+            container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total: ${Math.round(totalDist)} m</div>`;
         }
         async function searchAndNavigate(keyword) {
             if (!keyword.trim()) { alert("Enter a destination (e.g., bank)"); return; }
             const matches = markersArray.filter(m => m.poiData.name.toLowerCase().includes(keyword.toLowerCase()) || m.poiData.type.toLowerCase().includes(keyword.toLowerCase()));
-            if (matches.length === 0) { alert(`No "${keyword}" found. Try: bank, atm, food, info`); return; }
+            if (matches.length === 0) { alert(`No "${keyword}" found.`); return; }
             let target = matches[0];
             if (matches.length > 1) {
                 const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
                 const sel = prompt(`Multiple matches:\n${list}\nEnter number (1-${matches.length})`, "1");
                 if (!sel) return;
                 const idx = parseInt(sel)-1;
-                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid selection"); return; }
+                if (isNaN(idx) || idx<0 || idx>=matches.length) { alert("Invalid"); return; }
                 target = matches[idx];
             }
             let userPos = currentPosition;
             if (!userPos) {
                 userPos = await updateGPSIndicator();
-                if (!userPos) { alert("Cannot get your location. Enable GPS."); return; }
+                if (!userPos) { alert("Cannot get your location."); return; }
             }
             const tgtLatLng = target.getLatLng();
             if (destMarker) map.removeLayer(destMarker);
@@ -439,9 +452,8 @@
             currentRoute = null; destMarker = null;
         });
         
-        updateGPSIndicator().then(() => {
-            L.popup().setLatLng([-20.1325,28.6272]).setContent("✨ READY<br>🔍 Search GeoJSON layers (top‑right)<br>🧭 Left panel for bank navigation").openOn(map);
-        });
+        updateGPSIndicator();
+        console.log("🟢 MAP INITIALIZATION COMPLETE");
     }
 </script>
 </body>
