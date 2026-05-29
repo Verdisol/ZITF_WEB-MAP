@@ -133,7 +133,7 @@
 </div>
 
 <script>
-    // ========== LOGIN (exact credentials) ==========
+    // ========== LOGIN ==========
     document.getElementById('loginBtn').addEventListener('click', function() {
         const user = document.getElementById('loginUsername').value.trim();
         const pwd = document.getElementById('loginPassword').value.trim();
@@ -154,99 +154,87 @@
         L.control.layers({ "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer }, null, { position: 'topright' }).addTo(map);
         
         // ========== STORE FOR GEOJSON FEATURES (for searching) ==========
-        let geoJsonFeatures = []; // each item: { layer, feature, bounds }
+        let geoJsonFeatures = [];
         
-        // ========== 1. LOAD ZITF BOUNDARY ==========
+        // ========== 1. BOUNDARY LAYER (try external file, fallback to inline) ==========
+        let boundaryLayer;
         try {
             const resp = await fetch('ZITF BOUNDARY.geojson');
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const boundaryData = await resp.json();
-            const boundaryLayer = L.geoJSON(boundaryData, {
-                style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
-            }).addTo(map);
-            // Extract features for search
-            if (boundaryData.features) {
-                boundaryData.features.forEach(f => {
-                    geoJsonFeatures.push({
-                        layer: boundaryLayer,
-                        feature: f,
-                        bounds: L.geoJSON(f).getBounds(),
-                        source: 'ZITF BOUNDARY'
-                    });
-                });
-            }
-            console.log("✅ Boundary loaded");
-        } catch (err) {
-            console.warn("Could not load ZITF BOUNDARY.geojson", err);
-        }
-        
-        // ========== 2. LOAD ROADS.geojson (if exists) ==========
-        try {
-            const resp = await fetch('ROADS.geojson');
             if (resp.ok) {
-                const roadsData = await resp.json();
-                const roadsLayer = L.geoJSON(roadsData, {
-                    style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
+                const data = await resp.json();
+                boundaryLayer = L.geoJSON(data, {
+                    style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
                 }).addTo(map);
-                if (roadsData.features) {
-                    roadsData.features.forEach(f => {
-                        geoJsonFeatures.push({
-                            layer: roadsLayer,
-                            feature: f,
-                            bounds: L.geoJSON(f).getBounds(),
-                            source: 'ROADS'
-                        });
+                // add features to search index
+                if (data.features) {
+                    data.features.forEach(f => {
+                        geoJsonFeatures.push({ layer: boundaryLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ZITF BOUNDARY' });
                     });
                 }
-                console.log("✅ ROADS.geojson loaded");
+                console.log("✅ Loaded external ZITF BOUNDARY.geojson");
             } else {
-                console.log("ROADS.geojson not found, using inline roads");
-                // fallback to inline roads (same style)
-                const inlineRoads = {
-                    "type": "FeatureCollection", "features": [
-                        { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
-                        { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
-                        { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
-                    ]
-                };
-                const inlineLayer = L.geoJSON(inlineRoads, { style: { color: "#db1e2a", weight: 2.5, dashArray: "4,12", lineCap: 'round' } }).addTo(map);
-                inlineRoads.features.forEach(f => {
-                    geoJsonFeatures.push({ layer: inlineLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads (inline)' });
-                });
+                throw new Error("File not found");
             }
         } catch (err) {
-            console.warn("No ROADS.geojson, using inline roads", err);
-            // Inline roads fallback
-            const inlineRoads = { "type": "FeatureCollection", "features": [
-                { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
-                { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
-                { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
-            ] };
-            const inlineLayer = L.geoJSON(inlineRoads, { style: { color: "#db1e2a", weight: 2.5, dashArray: "4,12", lineCap: 'round' } }).addTo(map);
-            inlineRoads.features.forEach(f => {
-                geoJsonFeatures.push({ layer: inlineLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads' });
+            console.warn("Could not load ZITF BOUNDARY.geojson, using inline fallback");
+            // Inline fallback boundary (a simple rectangle around ZITF area)
+            const fallbackBoundary = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "properties": { "name": "ZITF Grounds (Fallback)" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[-20.1400,28.6200],[-20.1250,28.6200],[-20.1250,28.6350],[-20.1400,28.6350],[-20.1400,28.6200]]]
+                    }
+                }]
+            };
+            boundaryLayer = L.geoJSON(fallbackBoundary, {
+                style: { color: "#ff6600", weight: 3, fillOpacity: 0.1, fillColor: "#ffaa44" }
+            }).addTo(map);
+            fallbackBoundary.features.forEach(f => {
+                geoJsonFeatures.push({ layer: boundaryLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Boundary (fallback)' });
             });
         }
         
-        // ========== 3. ADD ANY OTHER UPPERCASE GEOJSON FILES? (optional) ==========
-        // You can list more files here, e.g., 'BUILDINGS.geojson', 'PARKING.geojson'
-        const extraFiles = []; // add names if needed
-        for (const file of extraFiles) {
-            try {
-                const resp = await fetch(file);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    const layer = L.geoJSON(data).addTo(map);
-                    if (data.features) {
-                        data.features.forEach(f => {
-                            geoJsonFeatures.push({ layer, feature: f, bounds: L.geoJSON(f).getBounds(), source: file });
-                        });
-                    }
+        // ========== 2. ROADS LAYER (try external ROADS.geojson, fallback to inline) ==========
+        let roadsLayer;
+        try {
+            const resp = await fetch('ROADS.geojson');
+            if (resp.ok) {
+                const data = await resp.json();
+                roadsLayer = L.geoJSON(data, {
+                    style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
+                }).addTo(map);
+                if (data.features) {
+                    data.features.forEach(f => {
+                        geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'ROADS' });
+                    });
                 }
-            } catch(e) { console.warn(`Could not load ${file}`); }
+                console.log("✅ Loaded external ROADS.geojson");
+            } else {
+                throw new Error("File not found");
+            }
+        } catch (err) {
+            console.warn("Could not load ROADS.geojson, using inline fallback roads (with QGIS red dashed style)");
+            // Inline roads with the exact QGIS style: red, dashed, round caps
+            const inlineRoads = {
+                "type": "FeatureCollection",
+                "features": [
+                    { "type": "Feature", "properties": { "name": "Main Avenue" }, "geometry": { "type": "LineString", "coordinates": [[28.6240,-20.1350],[28.6280,-20.1320],[28.6305,-20.1305]] } },
+                    { "type": "Feature", "properties": { "name": "Exhibition Road" }, "geometry": { "type": "LineString", "coordinates": [[28.6255,-20.1330],[28.6275,-20.1310],[28.6290,-20.1290]] } },
+                    { "type": "Feature", "properties": { "name": "Service Lane" }, "geometry": { "type": "LineString", "coordinates": [[28.6260,-20.1360],[28.6280,-20.1345],[28.6300,-20.1320]] } }
+                ]
+            };
+            roadsLayer = L.geoJSON(inlineRoads, {
+                style: { color: "#db1e2a", weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: "4, 12" }
+            }).addTo(map);
+            inlineRoads.features.forEach(f => {
+                geoJsonFeatures.push({ layer: roadsLayer, feature: f, bounds: L.geoJSON(f).getBounds(), source: 'Roads (inline)' });
+            });
         }
         
-        // ========== SEARCH FUNCTION FOR GEOJSON LAYERS ==========
+        // ========== 3. SEARCH FUNCTION FOR GEOJSON LAYERS ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
@@ -278,16 +266,15 @@
                     const match = matches[idx];
                     if (match && match.bounds.isValid()) {
                         map.fitBounds(match.bounds);
-                        // optional: flash the layer
+                        // temporary highlight
                         if (match.layer && match.layer.setStyle) {
+                            const originalStyle = match.layer.options.style;
                             match.layer.setStyle({ color: '#ffff00', weight: 5, opacity: 1 });
                             setTimeout(() => {
-                                if (match.layer.setStyle) {
-                                    if (match.source === 'ZITF BOUNDARY')
-                                        match.layer.setStyle({ color: "#ff6600", weight: 3, fillOpacity: 0.1 });
-                                    else
-                                        match.layer.setStyle({ color: "#db1e2a", weight: 2.5, dashArray: "4,12" });
-                                }
+                                if (match.source.includes('BOUNDARY'))
+                                    match.layer.setStyle({ color: "#ff6600", weight: 3, fillOpacity: 0.1 });
+                                else
+                                    match.layer.setStyle({ color: "#db1e2a", weight: 2.5, dashArray: "4,12" });
                             }, 1500);
                         }
                     }
@@ -304,7 +291,7 @@
             }
         });
         
-        // ========== VENUES (POI markers) ==========
+        // ========== 4. VENUES (POI markers with blinking & hover) ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -348,7 +335,7 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== GPS & ROUTING (unchanged) ==========
+        // ========== 5. GPS & ROUTING (unchanged) ==========
         let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
