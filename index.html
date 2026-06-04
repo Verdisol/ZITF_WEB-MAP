@@ -55,6 +55,16 @@
             text-shadow: 1px 1px 2px black;
         }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
+        .map-hint {
+            background: rgba(0,0,0,0.6);
+            text-align: center;
+            padding: 5px;
+            font-size: 0.8rem;
+            font-style: italic;
+            color: #ffdd99;
+            z-index: 1001;
+            border-bottom: 1px solid #ffaa33;
+        }
         
         @keyframes neonPulse {
             0% { filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44); }
@@ -154,6 +164,10 @@
             <button id="geoSearchBtn">SEARCH</button>
         </div>
         <div class="gps-indicator" id="gpsStatus"><span>🛰️</span> <span id="gpsText">Getting location...</span></div>
+    </div>
+    <!-- New hint line under the header, same italic text -->
+    <div class="map-hint">
+        <i>please use username: visitor / password: zitf@2026</i>
     </div>
     <div id="map"></div>
     <div id="searchResults" class="search-results"></div>
