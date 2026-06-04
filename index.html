@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Fixed GPS Navigation</title>
+    <title>ZITF Live Map – GPS Navigation Fixed</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; height: 100vh; background: #1e3a2f; }
         
-        /* Login page */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
@@ -32,7 +31,6 @@
         .login-card input { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 60px; background: #fff; font-size: 1rem; }
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         
-        /* Map UI (rest unchanged, same as before) */
         .map-container { display: none; flex-direction: column; height: 100vh; font-family: Arial, sans-serif; }
         .top-bar {
             background: url('zitf.jpg') center/cover no-repeat;
@@ -98,6 +96,7 @@
         .drag-hint { font-size: 0.7rem; text-align: center; margin-top: 8px; color: #aaa; }
         .nav-status { font-size: 0.7rem; margin-top: 5px; text-align: center; color: #ffaa66; }
         .reset-btn { background: #aa5533; margin-top: 5px; padding: 5px; font-size: 0.7rem; }
+        .manual-loc-btn { background: #2266aa; margin-top: 5px; padding: 5px; font-size: 0.7rem; }
         
         .directions-card {
             position: absolute; bottom: 20px; right: 20px; width: 310px; max-height: 360px;
@@ -152,6 +151,7 @@
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
         <div id="selectedDestInfo" class="selected-dest">No destination selected</div>
         <button id="resetDestBtn" class="reset-btn">🗑️ Clear selected destination</button>
+        <button id="manualLocBtn" class="manual-loc-btn">📍 Set start point (click on map)</button>
         <div id="navStatus" class="nav-status">Ready</div>
         <div class="drag-hint">(Drag the ⣿ handle to move)</div>
     </div>
@@ -165,7 +165,6 @@
     document.getElementById('loginBtn').addEventListener('click', function() {
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
-        // Updated credentials: username = "visitor", password = "zitf@2026"
         if (username === "visitor" && password === "zitf@2026") {
             document.getElementById('loginContainer').style.display = 'none';
             document.getElementById('mapContainer').style.display = 'flex';
@@ -180,7 +179,7 @@
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         
-        // ========== GEOJSON FILES (complete list) ==========
+        // ========== GEOJSON FILES ==========
         const geojsonFiles = [
             "ZITF BOUNDARY.geojson",
             "NATIONAL SECURITY FORCES.geojson",
@@ -252,7 +251,7 @@
         const baseLayers = { "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer };
         L.control.layers(baseLayers, overlayLayers, { position: 'bottomright' }).addTo(map);
         
-        // ========== HARDCODED VENUES (banks, food) ==========
+        // ========== HARDCODED VENUES ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -296,12 +295,13 @@
             if (marker._icon) marker._icon.classList.add('blinking-icon');
         });
         
-        // ========== GPS & ROUTING ==========
+        // ========== GPS & ROUTING WITH MANUAL FALLBACK ==========
         let currentPosition = null;
         let userMarker = null;
         let currentRoute = null;
         let destMarker = null;
         let selectedDestination = null;
+        let manualStartPoint = null; // for manual start
         
         const navStatusDiv = document.getElementById('navStatus');
         const selectedDestInfo = document.getElementById('selectedDestInfo');
@@ -312,9 +312,12 @@
             console.log(msg);
         }
         
+        // Default ZITF area center (fallback)
+        const DEFAULT_START = [-20.1325, 28.6272];
+        
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) reject("Geolocation not supported");
+                if (!navigator.geolocation) reject("Geolocation not supported by browser");
                 navigator.geolocation.getCurrentPosition(
                     pos => resolve([pos.coords.latitude, pos.coords.longitude]),
                     err => reject(`GPS error: ${err.message}`),
@@ -327,24 +330,54 @@
             try {
                 const pos = await getCurrentPosition();
                 currentPosition = pos;
+                manualStartPoint = null; // clear manual if GPS works
                 document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`;
                 document.getElementById('gpsStatus').style.background = "#1e7e44";
                 if (userMarker) map.removeLayer(userMarker);
-                userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup();
+                userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here (GPS)").openPopup();
                 map.setView(pos, 18);
                 setStatus("✅ GPS ready");
                 return pos;
             } catch (err) {
+                console.error(err);
                 document.getElementById('gpsText').innerHTML = `⚠️ GPS denied`;
                 document.getElementById('gpsStatus').style.background = "#aa5533";
-                setStatus(`❌ ${err}`, true);
-                return null;
+                setStatus(`❌ ${err} - using default location`, true);
+                // Use default ZITF center as fallback
+                const fallbackPos = DEFAULT_START;
+                currentPosition = fallbackPos;
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker(fallbackPos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("Default start (GPS failed)").openPopup();
+                map.setView(fallbackPos, 17);
+                return fallbackPos;
             }
         }
         
+        // Manual start point picker
+        let pickingStart = false;
+        document.getElementById('manualLocBtn').addEventListener('click', () => {
+            pickingStart = true;
+            setStatus("Click on map to set start point", false);
+            map.getContainer().style.cursor = 'crosshair';
+        });
+        map.on('click', (e) => {
+            if (pickingStart) {
+                const latlng = [e.latlng.lat, e.latlng.lng];
+                manualStartPoint = latlng;
+                currentPosition = latlng;
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker(latlng, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("Manual start point").openPopup();
+                setStatus(`Start point set to ${latlng[0].toFixed(4)}, ${latlng[1].toFixed(4)}`);
+                pickingStart = false;
+                map.getContainer().style.cursor = '';
+            }
+        });
+        
         async function fetchRoute(startLatLng, endLatLng) {
             const url = `https://router.project-osrm.org/route/v1/foot/${startLatLng[1]},${startLatLng[0]};${endLatLng[1]},${endLatLng[0]}?overview=full&geometries=geojson&steps=true`;
+            console.log("Fetching route:", url);
             const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             if (data.code !== 'Ok') throw new Error(`Routing failed: ${data.code}`);
             return data.routes[0];
@@ -379,21 +412,19 @@
         }
         
         async function navigateToDestination(destLatLng, destName) {
-            setStatus("📍 Getting your location...");
-            let userPos = currentPosition;
-            if (!userPos) {
-                userPos = await updateGPSIndicator();
-                if (!userPos) {
-                    setStatus("❌ Cannot get your location. Please allow GPS.", true);
-                    alert("GPS location not available. Please enable location services and refresh.");
+            if (!currentPosition) {
+                setStatus("Getting start location...");
+                await updateGPSIndicator();
+                if (!currentPosition) {
+                    setStatus("❌ No start location available. Use 'Set start point' button.", true);
                     return false;
                 }
             }
-            setStatus(`🚶 Routing to ${destName}...`);
+            setStatus(`🚶 Routing from ${currentPosition[0].toFixed(4)},${currentPosition[1].toFixed(4)} to ${destName}...`);
             if (destMarker) map.removeLayer(destMarker);
             destMarker = L.marker(destLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${destName}</b><br>Destination`).openPopup();
             try {
-                const route = await fetchRoute(userPos, [destLatLng.lat, destLatLng.lng]);
+                const route = await fetchRoute(currentPosition, [destLatLng.lat, destLatLng.lng]);
                 drawBlueRoute(route.geometry);
                 renderSteps(route);
                 setStatus(`✅ Route found! ${Math.round(route.distance)} meters.`);
@@ -401,7 +432,7 @@
             } catch (err) {
                 console.error(err);
                 setStatus(`❌ Routing error: ${err.message}`, true);
-                alert("Could not create walking route. Make sure both start and destination are on walkable paths.");
+                alert("Could not create walking route. Check console for details. Make sure start and destination are on walkable paths.");
                 return false;
             }
         }
@@ -508,7 +539,8 @@
             currentRoute = null;
         });
         
-        updateGPSIndicator();
+        // Initialize GPS and set default start
+        await updateGPSIndicator();
         
         // ========== DRAGGABLE NAVIGATION PANEL ==========
         const navPanel = document.getElementById('navPanel');
@@ -535,6 +567,8 @@
             navPanel.style.bottom = 'auto';
         });
         document.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; navPanel.classList.remove('dragging'); } });
+        
+        setStatus("Navigation ready. Search for a destination and click GET DIRECTIONS.");
     }
 </script>
 </body>
