@@ -30,6 +30,14 @@
         .safety-text { font-size: 1rem; color: #ccffcc; margin-bottom: 25px; font-style: italic; }
         .login-card input { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 60px; background: #fff; font-size: 1rem; }
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+        .login-hint {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #ffdd99;
+            background: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 30px;
+        }
         
         .map-container { display: none; flex-direction: column; height: 100vh; font-family: Arial, sans-serif; }
         .top-bar {
@@ -129,8 +137,12 @@
         <div class="safety-text">PLEASE ENJOY YOUR VISIT AND STAY SAFE</div>
         <div style="font-weight:bold; margin:15px 0 5px;">ENTER YOUR DETAILS TO LOG IN</div>
         <input type="text" id="loginUsername" placeholder="Username" value="visitor">
-        <input type="password" id="loginPassword" placeholder="Password" value="zitf@2026">
+        <!-- Password field now visible as plain text -->
+        <input type="text" id="loginPassword" placeholder="Password" value="zitf@2026">
         <button id="loginBtn">🔓 ACCESS MAP</button>
+        <div class="login-hint">
+            🔐 For login please use: <strong>username: visitor</strong> / <strong>password: zitf@2026</strong>
+        </div>
     </div>
 </div>
 
@@ -301,7 +313,7 @@
         let currentRoute = null;
         let destMarker = null;
         let selectedDestination = null;
-        let manualStartPoint = null; // for manual start
+        let manualStartPoint = null;
         
         const navStatusDiv = document.getElementById('navStatus');
         const selectedDestInfo = document.getElementById('selectedDestInfo');
@@ -312,7 +324,6 @@
             console.log(msg);
         }
         
-        // Default ZITF area center (fallback)
         const DEFAULT_START = [-20.1325, 28.6272];
         
         function getCurrentPosition() {
@@ -330,7 +341,7 @@
             try {
                 const pos = await getCurrentPosition();
                 currentPosition = pos;
-                manualStartPoint = null; // clear manual if GPS works
+                manualStartPoint = null;
                 document.getElementById('gpsText').innerHTML = `📍 ${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}`;
                 document.getElementById('gpsStatus').style.background = "#1e7e44";
                 if (userMarker) map.removeLayer(userMarker);
@@ -343,7 +354,6 @@
                 document.getElementById('gpsText').innerHTML = `⚠️ GPS denied`;
                 document.getElementById('gpsStatus').style.background = "#aa5533";
                 setStatus(`❌ ${err} - using default location`, true);
-                // Use default ZITF center as fallback
                 const fallbackPos = DEFAULT_START;
                 currentPosition = fallbackPos;
                 if (userMarker) map.removeLayer(userMarker);
@@ -353,7 +363,6 @@
             }
         }
         
-        // Manual start point picker
         let pickingStart = false;
         document.getElementById('manualLocBtn').addEventListener('click', () => {
             pickingStart = true;
@@ -539,7 +548,6 @@
             currentRoute = null;
         });
         
-        // Initialize GPS and set default start
         await updateGPSIndicator();
         
         // ========== DRAGGABLE NAVIGATION PANEL ==========
