@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>ZITF Live Map – Blinking UI + Draggable Nav</title>
+    <title>ZITF Live Map – Fixed GPS Navigation</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; height: 100vh; background: #1e3a2f; }
         
-        /* ----- LOGIN PAGE (blinking green shadow) ----- */
+        /* Login page */
         .login-container {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('zitf.jpg') center/cover no-repeat;
@@ -18,8 +18,7 @@
             z-index: 2000;
         }
         .login-card {
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(10px);
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
             border-radius: 40px; padding: 40px 35px;
             width: 90%; max-width: 450px; text-align: center;
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
@@ -33,7 +32,7 @@
         .login-card input { width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 60px; background: #fff; font-size: 1rem; }
         .login-card button { background: #ffaa33; color: #1e3a2f; border: none; padding: 14px; width: 100%; border-radius: 60px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
         
-        /* ----- MAP UI (blinking green shadow on all interactive boxes) ----- */
+        /* Map UI (rest unchanged, same as before) */
         .map-container { display: none; flex-direction: column; height: 100vh; font-family: Arial, sans-serif; }
         .top-bar {
             background: url('zitf.jpg') center/cover no-repeat;
@@ -50,18 +49,13 @@
         }
         .top-bar h1 { font-size: 1.3rem; margin-right: auto; }
         
-        /* Blinking shadow animation (same as markers) */
         @keyframes neonPulse {
             0% { filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44); }
             50% { filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44); }
             100% { filter: drop-shadow(0 0 0px #00ff66) drop-shadow(0 0 0px #00cc44); }
         }
-        .blinking-ui {
-            animation: neonPulse 0.9s infinite ease-in-out;
-            transition: all 0.2s;
-        }
+        .blinking-ui { animation: neonPulse 0.9s infinite ease-in-out; }
         
-        /* Apply blinking to search bar, GPS indicator, navigation panel, legend */
         .geojson-search {
             background: white; border-radius: 40px; padding: 4px 12px;
             display: flex; gap: 6px; align-items: center;
@@ -71,20 +65,11 @@
         .geojson-search button { background: #ffaa33; border: none; padding: 6px 18px; border-radius: 40px; font-weight: bold; cursor: pointer; }
         
         .gps-indicator {
-            background: rgba(0,0,0,0.7);
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-size: 0.8rem;
+            background: rgba(0,0,0,0.7); padding: 6px 14px; border-radius: 40px; font-size: 0.8rem;
             animation: neonPulse 0.9s infinite ease-in-out;
         }
         
-        /* Leaflet legend (layer control) – target the container */
-        .leaflet-control-layers {
-            animation: neonPulse 0.9s infinite ease-in-out;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
+        .leaflet-control-layers { animation: neonPulse 0.9s infinite ease-in-out; background: white; border-radius: 8px; }
         
         .search-results {
             position: absolute; top: 70px; right: 20px;
@@ -95,56 +80,24 @@
         .search-results div { padding: 8px 12px; border-bottom: 1px solid #ccc; cursor: pointer; }
         .search-results div:hover { background: #f0f0f0; }
         
-        /* Draggable Navigation Panel – also blinking */
         .nav-panel {
             position: absolute; top: 80px; left: 10px;
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(8px);
-            padding: 15px;
-            border-radius: 20px;
-            width: 280px;
-            z-index: 1000;
-            color: white;
-            border-left: 4px solid #00ff88;
-            cursor: default;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            padding: 15px; border-radius: 20px; width: 280px;
+            z-index: 1000; color: white; border-left: 4px solid #00ff88;
+            cursor: default; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             animation: neonPulse 0.9s infinite ease-in-out;
         }
-        .nav-panel.dragging {
-            opacity: 0.8;
-            cursor: grabbing;
-        }
-        .nav-panel h3 {
-            margin-bottom: 10px;
-            color: #88ffaa;
-            cursor: grab;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .nav-panel.dragging { opacity: 0.8; cursor: grabbing; }
+        .nav-panel h3 { margin-bottom: 10px; color: #88ffaa; cursor: grab; user-select: none; display: flex; align-items: center; gap: 8px; }
         .nav-panel h3:active { cursor: grabbing; }
-        .drag-handle {
-            font-size: 1.2rem;
-            margin-right: 5px;
-        }
+        .drag-handle { font-size: 1.2rem; margin-right: 5px; }
         .nav-panel input { width: 100%; padding: 10px; border-radius: 30px; border: none; margin: 8px 0; }
         .nav-panel button { width: 100%; background: #00cc66; border: none; padding: 10px; border-radius: 30px; font-weight: bold; cursor: pointer; }
-        .selected-dest {
-            font-size: 0.8rem;
-            color: #88ffaa;
-            margin-top: 5px;
-            background: #2a2a2a;
-            padding: 4px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .drag-hint {
-            font-size: 0.7rem;
-            text-align: center;
-            margin-top: 8px;
-            color: #aaa;
-        }
+        .selected-dest { font-size: 0.8rem; color: #88ffaa; margin-top: 5px; background: #2a2a2a; padding: 4px; border-radius: 8px; text-align: center; }
+        .drag-hint { font-size: 0.7rem; text-align: center; margin-top: 8px; color: #aaa; }
+        .nav-status { font-size: 0.7rem; margin-top: 5px; text-align: center; color: #ffaa66; }
+        .reset-btn { background: #aa5533; margin-top: 5px; padding: 5px; font-size: 0.7rem; }
         
         .directions-card {
             position: absolute; bottom: 20px; right: 20px; width: 310px; max-height: 360px;
@@ -156,7 +109,6 @@
         .close-dir { background: #aa3333; padding: 2px 10px; border-radius: 30px; cursor: pointer; }
         .step { padding: 8px 0; border-bottom: 1px solid #444; display: flex; gap: 8px; }
         
-        /* Marker blinking (unchanged) */
         @keyframes neonPulseMarker {
             0% { filter: drop-shadow(0 0 0px #00ff66); }
             50% { filter: drop-shadow(0 0 12px #00ff88) drop-shadow(0 0 6px #00ff44); }
@@ -177,7 +129,7 @@
         <div class="welcome-text">🇿🇼 WELCOME TO ZITF</div>
         <div class="safety-text">PLEASE ENJOY YOUR VISIT AND STAY SAFE</div>
         <div style="font-weight:bold; margin:15px 0 5px;">ENTER YOUR DETAILS TO LOG IN</div>
-        <input type="text" id="loginUsername" placeholder="Email" value="visitor@zitf.com">
+        <input type="text" id="loginUsername" placeholder="Username" value="visitor">
         <input type="password" id="loginPassword" placeholder="Password" value="zitf@2026">
         <button id="loginBtn">🔓 ACCESS MAP</button>
     </div>
@@ -199,6 +151,8 @@
         <input type="text" id="navSearchInput" placeholder="Search bank, atm, food..." value="bank">
         <button id="navGoBtn">🔍 GET DIRECTIONS</button>
         <div id="selectedDestInfo" class="selected-dest">No destination selected</div>
+        <button id="resetDestBtn" class="reset-btn">🗑️ Clear selected destination</button>
+        <div id="navStatus" class="nav-status">Ready</div>
         <div class="drag-hint">(Drag the ⣿ handle to move)</div>
     </div>
     <div id="directionsPanel" class="directions-card">
@@ -209,14 +163,15 @@
 
 <script>
     document.getElementById('loginBtn').addEventListener('click', function() {
-        const user = document.getElementById('loginUsername').value.trim();
-        const pwd = document.getElementById('loginPassword').value.trim();
-        if (user === "visitor@zitf.com" && pwd === "zitf@2026") {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value.trim();
+        // Updated credentials: username = "visitor", password = "zitf@2026"
+        if (username === "visitor" && password === "zitf@2026") {
             document.getElementById('loginContainer').style.display = 'none';
             document.getElementById('mapContainer').style.display = 'flex';
             initMap();
         } else {
-            alert("Invalid credentials.");
+            alert("Invalid credentials. Use username: visitor / password: zitf@2026");
         }
     });
 
@@ -225,7 +180,7 @@
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
         const map = L.map('map', { layers: [roadLayer] }).setView([-20.1325, 28.6272], 17);
         
-        // ========== COMPLETE LIST OF GEOJSON FILES ==========
+        // ========== GEOJSON FILES (complete list) ==========
         const geojsonFiles = [
             "ZITF BOUNDARY.geojson",
             "NATIONAL SECURITY FORCES.geojson",
@@ -255,7 +210,7 @@
         ];
         
         const overlayLayers = {};
-        let allFeatures = []; // for search index
+        let allFeatures = [];
         
         function getRandomColor() {
             const letters = '0123456789ABCDEF';
@@ -297,7 +252,7 @@
         const baseLayers = { "🗺️ Roads": roadLayer, "🛰️ Satellite": satelliteLayer };
         L.control.layers(baseLayers, overlayLayers, { position: 'bottomright' }).addTo(map);
         
-        // ========== VENUES (hardcoded POIs) ==========
+        // ========== HARDCODED VENUES (banks, food) ==========
         const venues = [
             { name: "EcoBank – Main Branch", type: "bank", lat: -20.1350, lng: 28.6242, icon: "🏦" },
             { name: "Stanbic Bank ATM Zone", type: "bank", lat: -20.1305, lng: 28.6295, icon: "🏧" },
@@ -342,19 +297,32 @@
         });
         
         // ========== GPS & ROUTING ==========
-        let currentPosition = null, userMarker = null, currentRoute = null, destMarker = null;
+        let currentPosition = null;
+        let userMarker = null;
+        let currentRoute = null;
+        let destMarker = null;
         let selectedDestination = null;
+        
+        const navStatusDiv = document.getElementById('navStatus');
+        const selectedDestInfo = document.getElementById('selectedDestInfo');
+        
+        function setStatus(msg, isError = false) {
+            navStatusDiv.innerHTML = msg;
+            navStatusDiv.style.color = isError ? '#ff8866' : '#88ffaa';
+            console.log(msg);
+        }
         
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) reject("Geolocation not supported");
                 navigator.geolocation.getCurrentPosition(
                     pos => resolve([pos.coords.latitude, pos.coords.longitude]),
-                    err => reject(err.message),
+                    err => reject(`GPS error: ${err.message}`),
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
             });
         }
+        
         async function updateGPSIndicator() {
             try {
                 const pos = await getCurrentPosition();
@@ -364,38 +332,42 @@
                 if (userMarker) map.removeLayer(userMarker);
                 userMarker = L.marker(pos, { icon: L.divIcon({ html: '📍', iconSize: [22,22] }) }).addTo(map).bindPopup("You are here").openPopup();
                 map.setView(pos, 18);
+                setStatus("✅ GPS ready");
                 return pos;
             } catch (err) {
-                document.getElementById('gpsText').innerHTML = `⚠️ ${err.slice(0,30)}`;
+                document.getElementById('gpsText').innerHTML = `⚠️ GPS denied`;
                 document.getElementById('gpsStatus').style.background = "#aa5533";
+                setStatus(`❌ ${err}`, true);
                 return null;
             }
         }
-        async function fetchRoute(start, end) {
-            const url = `https://router.project-osrm.org/route/v1/foot/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
+        
+        async function fetchRoute(startLatLng, endLatLng) {
+            const url = `https://router.project-osrm.org/route/v1/foot/${startLatLng[1]},${startLatLng[0]};${endLatLng[1]},${endLatLng[0]}?overview=full&geometries=geojson&steps=true`;
             const resp = await fetch(url);
             const data = await resp.json();
-            if (data.code !== 'Ok') throw new Error("No walkable route");
+            if (data.code !== 'Ok') throw new Error(`Routing failed: ${data.code}`);
             return data.routes[0];
         }
+        
         function drawBlueRoute(geojson) {
             if (currentRoute) map.removeLayer(currentRoute);
             currentRoute = L.geoJSON(geojson, { style: { color: "#2a7fff", weight: 6, opacity: 0.95, className: 'route-line' } }).addTo(map);
             map.fitBounds(currentRoute.getBounds());
         }
+        
         function renderSteps(routeObj) {
             const panel = document.getElementById('directionsPanel');
             const container = document.getElementById('stepsContainer');
             panel.style.display = 'block';
             container.innerHTML = '';
             let totalDist = 0;
-            if (!routeObj.legs) return;
+            if (!routeObj.legs) { container.innerHTML = "<div class='step'>No step instructions</div>"; return; }
             routeObj.legs.forEach(leg => {
                 totalDist += leg.distance;
                 (leg.steps || []).forEach((step, idx) => {
                     let instr = (step.maneuver && step.maneuver.instruction) ? step.maneuver.instruction : "Continue straight";
                     instr = instr.replace(/^Head /i, '👉 ').replace(/^Turn /i, '↪️ Turn ');
-                    if (!instr.includes('👉') && !instr.includes('↪️')) instr = '🔹 ' + instr;
                     const distText = step.distance ? ` (${Math.round(step.distance)} m)` : '';
                     const stepDiv = document.createElement('div');
                     stepDiv.className = 'step';
@@ -403,35 +375,41 @@
                     container.appendChild(stepDiv);
                 });
             });
-            container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total: ${Math.round(totalDist)} m</div>`;
+            container.innerHTML += `<div style="margin-top:12px; border-top:1px solid #55aa77; padding-top:8px;">📏 Total distance: ${Math.round(totalDist)} meters</div>`;
         }
         
         async function navigateToDestination(destLatLng, destName) {
+            setStatus("📍 Getting your location...");
             let userPos = currentPosition;
             if (!userPos) {
                 userPos = await updateGPSIndicator();
-                if (!userPos) { alert("Cannot get your location. Enable GPS."); return false; }
+                if (!userPos) {
+                    setStatus("❌ Cannot get your location. Please allow GPS.", true);
+                    alert("GPS location not available. Please enable location services and refresh.");
+                    return false;
+                }
             }
+            setStatus(`🚶 Routing to ${destName}...`);
             if (destMarker) map.removeLayer(destMarker);
             destMarker = L.marker(destLatLng, { icon: L.divIcon({ html: '🎯', iconSize: [28,28] }) }).addTo(map).bindPopup(`<b>${destName}</b><br>Destination`).openPopup();
             try {
                 const route = await fetchRoute(userPos, [destLatLng.lat, destLatLng.lng]);
                 drawBlueRoute(route.geometry);
                 renderSteps(route);
-                if (currentRoute) map.fitBounds(currentRoute.getBounds());
+                setStatus(`✅ Route found! ${Math.round(route.distance)} meters.`);
                 return true;
-            } catch(err) {
-                alert("Routing error: " + err.message);
-                document.getElementById('stepsContainer').innerHTML = `<div class="step">⚠️ Could not create route</div>`;
-                document.getElementById('directionsPanel').style.display = 'block';
+            } catch (err) {
+                console.error(err);
+                setStatus(`❌ Routing error: ${err.message}`, true);
+                alert("Could not create walking route. Make sure both start and destination are on walkable paths.");
                 return false;
             }
         }
         
-        async function searchAndNavigateVenue(keyword) {
+        async function searchVenueAndNavigate(keyword) {
             if (!keyword.trim()) { alert("Enter a destination"); return; }
             const matches = markersArray.filter(m => m.poiData.name.toLowerCase().includes(keyword.toLowerCase()) || m.poiData.type.toLowerCase().includes(keyword.toLowerCase()));
-            if (matches.length === 0) { alert(`No venue "${keyword}" found. Use the search box above to find toilets, halls, etc.`); return; }
+            if (matches.length === 0) { alert(`No venue "${keyword}" found. Use the top search bar for layers like toilets, halls.`); return; }
             let target = matches[0];
             if (matches.length > 1) {
                 const list = matches.map((m,i)=>`${i+1}. ${m.poiData.name} (${m.poiData.type})`).join('\n');
@@ -444,7 +422,7 @@
             const destLatLng = target.getLatLng();
             const destName = target.poiData.name;
             selectedDestination = { latlng: destLatLng, name: destName };
-            document.getElementById('selectedDestInfo').innerHTML = `📍 Selected: ${destName}`;
+            selectedDestInfo.innerHTML = `📍 Selected: ${destName}`;
             await navigateToDestination(destLatLng, destName);
         }
         
@@ -453,16 +431,24 @@
                 await navigateToDestination(selectedDestination.latlng, selectedDestination.name);
             } else {
                 const keyword = document.getElementById('navSearchInput').value.trim();
-                await searchAndNavigateVenue(keyword);
+                await searchVenueAndNavigate(keyword);
             }
         }
         
-        // ========== SEARCH BOX (GeoJSON layers) ==========
+        document.getElementById('resetDestBtn').addEventListener('click', () => {
+            selectedDestination = null;
+            selectedDestInfo.innerHTML = "No destination selected";
+            if (destMarker) map.removeLayer(destMarker);
+            if (currentRoute) map.removeLayer(currentRoute);
+            currentRoute = null;
+            setStatus("Destination cleared");
+            document.getElementById('directionsPanel').style.display = 'none';
+        });
+        
+        // ========== SEARCH FOR GEOJSON FEATURES ==========
         const searchInput = document.getElementById('geoSearchInput');
         const searchBtn = document.getElementById('geoSearchBtn');
         const resultsDiv = document.getElementById('searchResults');
-        const navGoBtn = document.getElementById('navGoBtn');
-        const selectedDestInfo = document.getElementById('selectedDestInfo');
         
         function performSearch() {
             const query = searchInput.value.trim().toLowerCase();
@@ -493,6 +479,7 @@
                             name: match.feature.properties.name || match.feature.properties.Name || `Feature from ${match.source}`
                         };
                         selectedDestInfo.innerHTML = `📍 Selected: ${selectedDestination.name} (click GET DIRECTIONS)`;
+                        setStatus(`Selected ${selectedDestination.name}. Press GET DIRECTIONS.`);
                         if (match.layer.setStyle) {
                             const orig = match.layer.options.style;
                             match.layer.setStyle({ color: '#ffff00', weight: 6 });
@@ -513,12 +500,11 @@
                 resultsDiv.style.display = 'none';
         });
         
-        navGoBtn.addEventListener('click', handleNavigation);
+        document.getElementById('navGoBtn').addEventListener('click', handleNavigation);
         document.getElementById('navSearchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleNavigation(); });
         document.getElementById('closeDirBtn').addEventListener('click', () => {
             document.getElementById('directionsPanel').style.display = 'none';
             if (currentRoute) map.removeLayer(currentRoute);
-            if (destMarker && !selectedDestination) map.removeLayer(destMarker);
             currentRoute = null;
         });
         
@@ -527,9 +513,7 @@
         // ========== DRAGGABLE NAVIGATION PANEL ==========
         const navPanel = document.getElementById('navPanel');
         const dragHandle = navPanel.querySelector('h3');
-        let isDragging = false;
-        let offsetX, offsetY;
-        
+        let isDragging = false, offsetX, offsetY;
         dragHandle.addEventListener('mousedown', (e) => {
             if (e.target.closest('.drag-handle') || e.target === dragHandle || dragHandle.contains(e.target)) {
                 isDragging = true;
@@ -539,25 +523,18 @@
                 e.preventDefault();
             }
         });
-        
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            let newLeft = e.clientX - offsetX;
-            let newTop = e.clientY - offsetY;
-            newLeft = Math.min(Math.max(newLeft, 5), window.innerWidth - navPanel.offsetWidth - 5);
-            newTop = Math.min(Math.max(newTop, 5), window.innerHeight - navPanel.offsetHeight - 5);
-            navPanel.style.left = newLeft + 'px';
-            navPanel.style.top = newTop + 'px';
+            let left = e.clientX - offsetX;
+            let top = e.clientY - offsetY;
+            left = Math.min(Math.max(left, 5), window.innerWidth - navPanel.offsetWidth - 5);
+            top = Math.min(Math.max(top, 5), window.innerHeight - navPanel.offsetHeight - 5);
+            navPanel.style.left = left + 'px';
+            navPanel.style.top = top + 'px';
             navPanel.style.right = 'auto';
             navPanel.style.bottom = 'auto';
         });
-        
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                navPanel.classList.remove('dragging');
-            }
-        });
+        document.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; navPanel.classList.remove('dragging'); } });
     }
 </script>
 </body>
